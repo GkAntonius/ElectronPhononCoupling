@@ -1,0 +1,21 @@
+1           # number of cpu
+3           # static with control over active space
+output/test32.out  # output
+0.01        # smearing parameter
+y           # do compute temperature dependance
+0 600 300   # Temperature range and step
+n           # do not compute lifetime
+3           # number of q-points
+../diamond-rf-data/odat_calc_DS10_DDB
+../diamond-rf-data/odat_calc_DS14_DDB
+../diamond-rf-data/odat_calc_DS18_DDB
+../diamond-rf-data/odat_calc_DS9_EIG.nc
+../diamond-rf-data/odat_calc_DS13_EIG.nc
+../diamond-rf-data/odat_calc_DS17_EIG.nc
+../diamond-rf-data/odat_calc_DS10_EIGR2D.nc
+../diamond-rf-data/odat_calc_DS14_EIGR2D.nc
+../diamond-rf-data/odat_calc_DS18_EIGR2D.nc
+../diamond-rf-data/odat_calc_DS10_FAN.nc
+../diamond-rf-data/odat_calc_DS14_FAN.nc
+../diamond-rf-data/odat_calc_DS18_FAN.nc
+../diamond-rf-data/odat_calc_DS2_EIG.nc
