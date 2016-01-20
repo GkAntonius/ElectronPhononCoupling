@@ -5,7 +5,7 @@ import numpy as N
 from ..core import EPC_Analyzer
 from ..core.constants import Ha2eV
 
-from ..core.release import __version__
+from ..setup import __version__
 from ..core.util import report_runtime
 
 # ============================================================================ #

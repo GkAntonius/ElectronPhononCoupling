@@ -9,9 +9,12 @@ from numpy import zeros
 from .constants import tol6, tol8, Ha2eV, kb_HaK
 from .dynmat import compute_dynmat, get_reduced_displ
 from .degenerate import get_degen, make_average, symmetrize_fan_degen
-from .rf_mods import RFStructure 
+#from .rf_mods import RFStructure 
+from . import EigFile, Eigr2dFile, FanFile, DdbFile
 
 from .mathutil import get_bose
+
+__author__ = "Gabriel Antonius, Samuel Ponce"
 
 # =========================================================================== #
 
@@ -24,31 +27,29 @@ from .mathutil import get_bose
 # Compute the static ZPR with temperature-dependence
 def static_zpm_temp(arguments,ddw,temperatures,degen):
   sys.stdout.flush()
-  nbqpt,wtq,eigq_files,DDB_files,EIGR2D_files = arguments
-  DDB = RFStructure(DDB_files)
-  EIGR2D = RFStructure(EIGR2D_files)
+  nbqpt,wtq,eigq_files,DDB_files,EIGR2D_files = arguments  # FIXME Eyesore
+  DDB = DdbFile(DDB_files)
+  EIGR2D = Eigr2dFile(EIGR2D_files)
   total_corr =  zeros((3,len(temperatures),EIGR2D.nkpt,EIGR2D.nband),dtype=complex)
-  eigq = RFStructure(eigq_files)
+  eigq = EigFile(eigq_files)
 
   # If the q-point mesh is homogenous, retreve the weight of the q-point
   if (wtq == 0):
     wtq = EIGR2D.wtq[0]
 
   # Current Q-point calculated
-  print("Q-point: {} with wtq = {} and reduced coord. {}".format(nbqpt, wtq, EIGR2D.iqpt))
+  print("Q-point: {} with wtq = {} and reduced coord. {}".format(nbqpt, wtq, EIGR2D.qred))
 
-  # Find phonon freq and eigendisplacement from _DDB
-  omega,eigvect,gprimd=compute_dynmat(DDB)
+  # Get reduced displacement (scaled with frequency)
+  displ_red_FAN2, displ_red_DDW2 = DDB.get_reduced_displ()
+
+  bose = get_bose(DDB.natom, DDB.omega, temperatures)
 
   fan_corr =  zeros((len(temperatures),EIGR2D.nkpt,EIGR2D.nband),dtype=complex)
   ddw_corr = zeros((len(temperatures),EIGR2D.nkpt,EIGR2D.nband),dtype=complex)
 
-  bose = get_bose(EIGR2D.natom,omega,temperatures)
-
-  # Get reduced displacement (scaled with frequency)
-  displ_red_FAN2,displ_red_DDW2 = get_reduced_displ(EIGR2D.natom,eigvect,omega,gprimd)
-  fan_corrQ = N.einsum('ijklmn,olnkm->oij',EIGR2D.EIG2D,displ_red_FAN2)
-  ddw_corrQ = N.einsum('ijklmn,olnkm->oij',ddw,displ_red_DDW2)
+  fan_corrQ = N.einsum('ijklmn,olnkm->oij', EIGR2D.EIG2D, displ_red_FAN2)
+  ddw_corrQ = N.einsum('ijklmn,olnkm->oij',ddw, displ_red_DDW2)
 
   fan_corr = N.einsum('ijk,il->ljk',fan_corrQ,2*bose+1.0)
   ddw_corr = N.einsum('ijk,il->ljk',ddw_corrQ,2*bose+1.0)
@@ -68,19 +69,19 @@ def static_zpm_temp(arguments,ddw,temperatures,degen):
 def dynamic_zpm_temp(arguments,ddw,ddw_active,calc_type,temperatures,smearing,eig0,degen):
 
   nbqpt,wtq,eigq_files,DDB_files,EIGR2D_files,FAN_files = arguments
-  FANterm = RFStructure(FAN_files)
+  FANterm = FanFile(FAN_files)
   FAN = FANterm.FAN
-  DDB = RFStructure(DDB_files)
-  EIGR2D = RFStructure(EIGR2D_files)
+  DDB = DdbFile(DDB_files)
+  EIGR2D = Eigr2dFile(EIGR2D_files)
   total_corr =  zeros((3,len(temperatures),EIGR2D.nkpt,EIGR2D.nband),dtype=complex)
-  eigq = RFStructure(eigq_files)
+  eigq = EigFile(eigq_files)
 
   # If the q-point mesh is homogenous, retreve the weight of the q-point
   if (wtq == 0):
     wtq = EIGR2D.wtq[0]
 
   # Current Q-point calculated
-  print("Q-point: {} with wtq = {} and reduced coord. {}".format(nbqpt, wtq, EIGR2D.iqpt))
+  print("Q-point: {} with wtq = {} and reduced coord. {}".format(nbqpt, wtq, EIGR2D.qred))
 
   # Find phonon freq and eigendisplacement from _DDB
   omega,eigvect,gprimd=compute_dynmat(DDB)
@@ -201,17 +202,17 @@ def static_zpm_lifetime(arguments, degen):
   """Compute the static ZPR only with lifetime."""
 
   nbqpt,wtq,eigq_files,DDB_files,EIGI2D_files = arguments
-  DDB = RFStructure(DDB_files)
-  EIGI2D = RFStructure(EIGI2D_files)
+  DDB = DdbFile(DDB_files)
+  EIGI2D = Eigr2dFile(EIGI2D_files)
   total_corr = zeros((3,EIGI2D.nkpt,EIGI2D.nband),dtype=complex)
-  eigq = RFStructure(eigq_files)
+  eigq = EigFile(eigq_files)
 
   # If the q-point mesh is homogenous, retreve the weight of the q-point
   if (wtq == 0):
     wtq = EIGI2D.wtq[0]
 
   # Current Q-point calculated
-  print("Q-point: {} with wtq = {} and reduced coord. {}".format(nbqpt, wtq, EIGI2D.iqpt))
+  print("Q-point: {} with wtq = {} and reduced coord. {}".format(nbqpt, wtq, EIGI2D.qred))
 
   # Find phonon freq and eigendisplacement from _DDB
   omega,eigvect,gprimd=compute_dynmat(DDB)
@@ -268,17 +269,17 @@ def static_zpm_lifetime(arguments, degen):
 def static_zpm_temp_lifetime(arguments,ddw,temperatures,degen):
 
   nbqpt,wtq,eigq_files,DDB_files,EIGI2D_files = arguments
-  DDB = RFStructure(DDB_files)
-  EIGI2D = RFStructure(EIGI2D_files)
+  DDB = DdbFile(DDB_files)
+  EIGI2D = Eigr2dFile(EIGI2D_files)
   total_corr =  zeros((3,len(temperatures),EIGI2D.nkpt,EIGI2D.nband),dtype=complex)
-  eigq = RFStructure(eigq_files)
+  eigq = EigFile(eigq_files)
 
   # If the q-point mesh is homogenous, retreve the weight of the q-point
   if (wtq == 0):
     wtq = EIGI2D.wtq[0]
 
   # Current Q-point calculated
-  print("Q-point: {} with wtq = {} and reduced coord. {}".format(nbqpt, wtq, EIGI2D.iqpt))
+  print("Q-point: {} with wtq = {} and reduced coord. {}".format(nbqpt, wtq, EIGI2D.qred))
 
   # Find phonon freq and eigendisplacement from _DDB
   omega,eigvect,gprimd=compute_dynmat(DDB)

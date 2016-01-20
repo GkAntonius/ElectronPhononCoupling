@@ -1,6 +1,18 @@
 # coding: utf-8
 
-__version__ = '2.3.2'
+__all__ = [
+    '__version__',
+    'name',
+    'description',
+    'long_description',
+    'license',
+    '__author__',
+    'author',
+    'url',
+    ]
+
+
+__version__ = '3.0.0'
 
 name = "ElectronPhononCoupling"
 

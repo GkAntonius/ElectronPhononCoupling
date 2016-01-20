@@ -7,13 +7,12 @@ import copy
 import multiprocessing
 from functools import partial
 
-import numpy as N
+import numpy as np
 from numpy import zeros
 import netCDF4 as nc
 
 from .constants import tol6, tol8, Ha2eV, kb_HaK
 
-from .dynmat import compute_dynmat, get_reduced_displ
 from .degenerate import get_degen, make_average, symmetrize_fan_degen
 from .util import create_directory, formatted_array_lines
 
@@ -23,7 +22,8 @@ from .tdep import (static_zpm_temp, dynamic_zpm_temp, static_zpm_lifetime,
 from .zpm import (get_qpt_zpr_static, get_qpt_zpr_dynamical,
                   get_qpt_zpb_dynamical, get_qpt_zpb_static_control,
                   get_qpt_zp_self_energy)
-from .rf_mods import RFStructure 
+
+from . import EigFile, Eigr2dFile, FanFile, DdbFile
 
 from ..parallel import summer
 
@@ -111,11 +111,13 @@ class EPC_Analyzer:
         # Check that the first q-point is Gamma
         self.check_Gamma()
 
+
+        # FIXME ============ #
         # Open the eig0 file
-        self.eig0 = RFStructure(eig0_fname)
+        self.eig0 = EigFile(eig0_fname)
 
         # Read the EIGR2D file at Gamma and save it in ddw
-        self.EIGR2D = RFStructure(EIGR2D_fnames[0])
+        self.EIGR2D = Eigr2dFile(EIGR2D_fnames[0])
         self.nkpt = self.EIGR2D.nkpt
         self.nband = self.EIGR2D.nband
         self.kpts = self.EIGR2D.kpt[:,:]
@@ -124,8 +126,10 @@ class EPC_Analyzer:
 
         # Open the first FAN file for DDW
         if FAN_fnames:
-            self.FAN = RFStructure(FAN_fnames[0])
+            self.FAN = FanFile(FAN_fnames[0])
             self.ddw_active = copy.deepcopy(self.FAN.FAN)  # (nkpt,nband,3,natom,3,natom,nband), complex
+
+        # FIXME ============ #
 
         # Find the degenerate eigenstates
         self.degen =  get_degen(self.eig0.EIG)
@@ -134,7 +138,7 @@ class EPC_Analyzer:
         self.compute_wtq(wtq)
 
         # qpoint indicies
-        self.iqpts = N.arange(self.nqpt)
+        self.iqpts = np.arange(self.nqpt)
 
         #eig0_pass = copy.deepcopy(eig0.EIG)
 
@@ -148,11 +152,11 @@ class EPC_Analyzer:
 
     def set_temp_range(self, temp_range=(0, 0, 1)):
         """Set the minimum, makimum and step temperature."""
-        self.temperatures = N.arange(*temp_range, dtype=float)
+        self.temperatures = np.arange(*temp_range, dtype=float)
 
     def set_omega_range(self, omega_range=(0, 0, 1)):
         """Set the minimum, makimum and step frequency for the self-energy."""
-        self.omegase = N.arange(*omega_range, dtype=float)
+        self.omegase = np.arange(*omega_range, dtype=float)
         self.nomegase = len(self.omegase)
 
     def set_smearing(self, smearing_Ha):
@@ -165,27 +169,26 @@ class EPC_Analyzer:
     
     def check_Gamma(self):
         """Check that the first q-point is Gamma and raise exception otherwise."""
-        DDBtmp = RFStructure(self.DDB_fnames[0])
-        if not N.allclose(DDBtmp.iqpt, [0.0,0.0,0.0]):
+        DDBtmp = DdbFile(self.DDB_fnames[0])
+        if not np.allclose(DDBtmp.qred, [0.0,0.0,0.0]):
             raise Exception('The first Q-point is not Gamma.')
 
     def compute_wtq(self, wtq):
         """Compute the q-point weights."""
 
         if wtq is not None:
-            self.wtq = N.array(wtq, dtype=N.float) / sum(wtq)
+            self.wtq = np.array(wtq, dtype=np.float) / sum(wtq)
             return
 
         if (self.EIGR2D.wtq == 0):
-            self.wtq = N.ones((self.nqpt)) * 1.0 / self.nqpt
+            self.wtq = np.ones((self.nqpt)) * 1.0 / self.nqpt
             return
 
-        #wtq = self.pool.map(lambda fname: RFStructure(fname).wtq[0], self.EIGR2D_fnames)
-        wtq = map(lambda fname: RFStructure(fname).wtq[0], self.EIGR2D_fnames)
+        wtq = map(lambda fname: Eigr2dFile(fname).wtq[0], self.EIGR2D_fnames)
 
         total_wtq = sum(wtq)
 
-        self.wtq = N.array(wtq)
+        self.wtq = np.array(wtq)
 
         if abs(total_wtq-1) > 0.1:
             raise Exception("The total weigth is not equal to 1.0. Check that you provide all the q-points.")
@@ -196,7 +199,7 @@ class EPC_Analyzer:
         partial_static_zpm_temp = partial(static_zpm_temp, ddw=self.ddw, temperatures=self.temperatures, degen=self.degen)
         qpt_corr = self.pool.map(partial_static_zpm_temp,arguments)
         total_corr = sum(qpt_corr)
-        total_corr = N.einsum('okij->oijk', total_corr)
+        total_corr = np.einsum('okij->oijk', total_corr)
         self.temperature_dependent_renormalization = total_corr[0]
         self.fan_temperature_dependent_renormalization = total_corr[1]
         self.ddw_temperature_dependent_renormalization = total_corr[2]
@@ -217,7 +220,7 @@ class EPC_Analyzer:
                                            eig0=self.eig0.EIG, degen=self.degen)
         qpt_corr = self.pool.map(partial_dynamic_zpm_temp,arguments)
         total_corr = sum(qpt_corr)
-        total_corr = N.einsum('okij->oijk', total_corr)
+        total_corr = np.einsum('okij->oijk', total_corr)
         self.temperature_dependent_renormalization = total_corr[0]
         self.fan_temperature_dependent_renormalization = total_corr[1]
         self.ddw_temperature_dependent_renormalization = total_corr[2]
@@ -241,7 +244,7 @@ class EPC_Analyzer:
                                            eig0=self.eig0.EIG, degen=self.degen)
         qpt_corr = self.pool.map(partial_dynamic_zpm_temp, arguments)
         total_corr = sum(qpt_corr)
-        total_corr = N.einsum('okij->oijk', total_corr)
+        total_corr = np.einsum('okij->oijk', total_corr)
         self.temperature_dependent_renormalization = total_corr[0]
         self.fan_temperature_dependent_renormalization = total_corr[1]
         self.ddw_temperature_dependent_renormalization = total_corr[2]
@@ -262,7 +265,7 @@ class EPC_Analyzer:
                                                    temperatures=self.temperatures, degen=self.degen)
         qpt_brd = self.pool.map(partial_static_zpm_temp_lifetime, arguments)
         total_brd = sum(qpt_brd)
-        total_brd = N.einsum('oij->ijo', total_brd)
+        total_brd = np.einsum('oij->ijo', total_brd)
         self.temperature_dependent_broadening = total_brd
 
     def compute_static_zp_broadening(self):
@@ -279,7 +282,7 @@ class EPC_Analyzer:
                                                    temperatures=self.temperatures, degen=self.degen)
         qpt_brd = self.pool.map(partial_static_zpm_temp_lifetime, arguments)
         total_brd = sum(qpt_brd)
-        total_brd = N.einsum('oij->ijo', total_brd)
+        total_brd = np.einsum('oij->ijo', total_brd)
         self.temperature_dependent_broadening = total_brd
         self.broadening_is_dynamical = True
 
@@ -297,7 +300,7 @@ class EPC_Analyzer:
                                                    temperatures=self.temperatures, degen=self.degen)
         qpt_brd = self.pool.map(partial_static_zpm_temp_lifetime, arguments)
         total_brd = sum(qpt_brd)
-        total_brd = N.einsum('oij->ijo', total_brd)
+        total_brd = np.einsum('oij->ijo', total_brd)
         self.temperature_dependent_broadening = total_brd
 
     def compute_static_control_zp_broadening(self):
@@ -328,9 +331,9 @@ class EPC_Analyzer:
             A'_kn(omega) = A_kn(omega + E^0_kn)
 
         """
-        self.spectral_function = N.zeros((self.nomegase, self.nkpt, self.nband), dtype=float)
-        omega = N.einsum('ij,m->ijm', N.ones((self.nkpt, self.nband)), self.omegase)
-        self.spectral_function = (1 / N.pi) * N.abs(self.self_energy.imag) / (
+        self.spectral_function = np.zeros((self.nomegase, self.nkpt, self.nband), dtype=float)
+        omega = np.einsum('ij,m->ijm', np.ones((self.nkpt, self.nband)), self.omegase)
+        self.spectral_function = (1 / np.pi) * np.abs(self.self_energy.imag) / (
                                 (omega - self.self_energy.real) ** 2 + self.self_energy.imag ** 2)
 
 

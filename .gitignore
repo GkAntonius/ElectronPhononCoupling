@@ -1,0 +1,18 @@
+
+# Developement files
+Tests
+tags
+TODO
+
+# Temporary files
+*.swp
+tmp
+
+# Files produced by the setup script
+*.pyc
+BGWpy.egg-info
+build
+build/*
+dist/*/
+dist/*.egg
+
