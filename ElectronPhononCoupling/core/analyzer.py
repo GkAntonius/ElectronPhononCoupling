@@ -29,7 +29,7 @@ from ..parallel import summer
 
 # =========================================================================== #
 
-class EPC_Analyzer:
+class EPC_Analyzer(object):
     """
     Main class for analysing electron-phonon coupling related quantities.
 
@@ -149,6 +149,7 @@ class EPC_Analyzer:
 
     def __del__(self):
         self.pool.close()
+        #super(EPC_Analyzer, self).__del__()
 
     def set_temp_range(self, temp_range=(0, 0, 1)):
         """Set the minimum, makimum and step temperature."""

@@ -41,7 +41,7 @@ class DdbFile(EpcFile):
             self.E2D.real = root.variables['second_derivative_of_energy'][:,:,:,:,0]
             self.E2D.imag = root.variables['second_derivative_of_energy'][:,:,:,:,1]
 
-            self.BEC = root.variables['born_effective_charge_tensor'][:self.ncart,:self.natom,:self.ncart]
+            self.BECT = root.variables['born_effective_charge_tensor'][:self.ncart,:self.natom,:self.ncart]
 
 
     # This function should not be used, but it is left here for legacy code.

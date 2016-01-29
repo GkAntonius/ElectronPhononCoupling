@@ -83,8 +83,10 @@ def dynamic_zpm_temp(arguments,ddw,ddw_active,calc_type,temperatures,smearing,ei
   # Current Q-point calculated
   print("Q-point: {} with wtq = {} and reduced coord. {}".format(nbqpt, wtq, EIGR2D.qred))
 
-  # Find phonon freq and eigendisplacement from _DDB
-  omega,eigvect,gprimd=compute_dynmat(DDB)
+  # Get reduced displacement (scaled with frequency)
+  displ_red_FAN2, displ_red_DDW2 = DDB.get_reduced_displ()
+
+  bose = get_bose(DDB.natom, DDB.omega, temperatures)
 
   # Compute the displacement = eigenvectors of the DDB. 
   # Due to metric problem in reduce coordinate we have to work in cartesian
@@ -94,11 +96,6 @@ def dynamic_zpm_temp(arguments,ddw,ddw_active,calc_type,temperatures,smearing,ei
   fan_add = N.array(zeros((len(temperatures),EIGR2D.nkpt,EIGR2D.nband),dtype=complex))
   ddw_add = N.array(zeros((len(temperatures),EIGR2D.nkpt,EIGR2D.nband),dtype=complex))
 
-  bose = get_bose(EIGR2D.natom,omega,temperatures)
-
-  # Get reduced displacement (scaled with frequency)
-  displ_red_FAN2,displ_red_DDW2 = get_reduced_displ(EIGR2D.natom,eigvect,omega,gprimd)
-
   # Einstein sum make the vector matrix multiplication ont the correct indices
   fan_corrQ = N.einsum('ijklmn,olnkm->oij',EIGR2D.EIG2D,displ_red_FAN2)
   ddw_corrQ = N.einsum('ijklmn,olnkm->oij',ddw,displ_red_DDW2)
@@ -106,7 +103,7 @@ def dynamic_zpm_temp(arguments,ddw,ddw_active,calc_type,temperatures,smearing,ei
   fan_corr = N.einsum('ijk,il->ljk',fan_corrQ,2*bose+1.0)
   ddw_corr = N.einsum('ijk,il->ljk',ddw_corrQ,2*bose+1.0)
 
-  print("Now compute active space ...")
+  #print("Now compute active space ...")
 
   # Now compute active space
   fan_addQ = N.einsum('ijklmno,plnkm->ijop',FAN,displ_red_FAN2)
@@ -214,8 +211,8 @@ def static_zpm_lifetime(arguments, degen):
   # Current Q-point calculated
   print("Q-point: {} with wtq = {} and reduced coord. {}".format(nbqpt, wtq, EIGI2D.qred))
 
-  # Find phonon freq and eigendisplacement from _DDB
-  omega,eigvect,gprimd=compute_dynmat(DDB)
+  # Get reduced displacement (scaled with frequency)
+  displ_red_FAN2, displ_red_DDW2 = DDB.get_reduced_displ()
 
   # For efficiency it is beter not to call a function
   EIG2D = EIGI2D.EIG2D
@@ -228,7 +225,6 @@ def static_zpm_lifetime(arguments, degen):
   # but then go back to reduce because our EIGR2D matrix elements are in reduced coord.
   displ_FAN =  zeros((3,3),dtype=complex)
   broadening = zeros((nkpt,nband),dtype=complex)
-  displ_red_FAN2, displ_red_DDW2 = get_reduced_displ(natom, eigvect, omega, gprimd)
 
   # Einstein sum make the vector matrix multiplication ont the correct indices
   fan_corrQ = N.einsum('ijklmn,olnkm->oij', EIG2D, displ_red_FAN2)
@@ -281,42 +277,17 @@ def static_zpm_temp_lifetime(arguments,ddw,temperatures,degen):
   # Current Q-point calculated
   print("Q-point: {} with wtq = {} and reduced coord. {}".format(nbqpt, wtq, EIGI2D.qred))
 
-  # Find phonon freq and eigendisplacement from _DDB
-  omega,eigvect,gprimd=compute_dynmat(DDB)
-
   # For efficiency it is beter not to call a function
   EIG2D = EIGI2D.EIG2D
   nkpt = EIGI2D.nkpt
   nband = EIGI2D.nband
   natom = EIGI2D.natom
 
-  # Compute the displacement = eigenvectors of the DDB. 
-  # Due to metric problem in reduce coordinate we have to work in cartesian
-  # but then go back to reduce because our EIGR2D matrix elements are in reduced coord.
-  displ_FAN =  zeros((3,3),dtype=complex)
-  displ_red_FAN2 = zeros((3*natom,natom,natom,3,3),dtype=complex)
+  # Get reduced displacement (scaled with frequency)
+  displ_red_FAN2, displ_red_DDW2 = DDB.get_reduced_displ()
 
-  broadening =  zeros((len(temperatures),nkpt,nband),dtype=complex)
-  bose = get_bose(EIGI2D.natom,omega,temperatures)
+  bose = get_bose(DDB.natom, DDB.omega, temperatures)
 
-  for imode in N.arange(3*natom): #Loop on perturbation (6 for 2 atoms)
-    if omega[imode].real > tol6:
-      for iatom1 in N.arange(natom):
-        for iatom2 in N.arange(natom):
-          for idir1 in N.arange(0,3):
-            for idir2 in N.arange(0,3):
-              displ_FAN[idir1,idir2] = eigvect[3*iatom2+idir2,imode].conj()\
-                 *eigvect[3*iatom1+idir1,imode]/(2.0*omega[imode].real)
-              # Now switch to reduced coordinates in 2 steps (more efficient)
-          tmp_displ_FAN = zeros((3,3),dtype=complex)
-          for idir1 in N.arange(3):
-            for idir2 in N.arange(3):
-              tmp_displ_FAN[:,idir1] = tmp_displ_FAN[:,idir1]+displ_FAN[:,idir2]*gprimd[idir2,idir1]
-          displ_red_FAN = zeros((3,3),dtype=complex)
-          for idir1 in N.arange(3):
-            for idir2 in N.arange(3):
-              displ_red_FAN[idir1,:] = displ_red_FAN[idir1,:] + tmp_displ_FAN[idir2,:]*gprimd[idir2,idir1]
-          displ_red_FAN2[imode,iatom1,iatom2,:,:] = displ_red_FAN[:,:]
   fan_corrQ = N.einsum('ijklmn,olnkm->oij',EIG2D,displ_red_FAN2)
 
   for imode in N.arange(3*natom): #Loop on perturbation (6 for 2 atoms)
