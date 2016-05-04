@@ -1,5 +1,6 @@
 
 ElectronPhononCoupling
+======================
 
 Python module to analyze electron-phonon related quantities from ABINIT.
 
@@ -25,7 +26,7 @@ Interactive usage:
 
 As a python module:
 
-    from ElectronPhononCoupling import get_epc
+    from ElectronPhononCoupling import compute_epc
 
-See examples in ElectronPhononCoupling/data/inputs-for-tests/
+See examples in ElectronPhononCoupling/data/inputs_for_tests/
 
