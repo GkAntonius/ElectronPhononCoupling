@@ -12,7 +12,6 @@ from .constants import tol6, tol8, Ha2eV, kb_HaK
 from .degenerate import make_average, symmetrize_fan_degen
 
 from .mathutil import delta_lorentzian
-#from .rf_mods import RFStructure 
 from . import EigFile, Eigr2dFile, FanFile, DdbFile
 
 __author__ = "Gabriel Antonius, Samuel Ponce"
@@ -137,7 +136,10 @@ def get_qpt_zpr_dynamical(args, ddw, ddw_active, option, smearing, eig0, degen):
         ddw_tmp = np.sum(ddw_addQ, axis=3)
 
         # nband
-        occtmp = EIGR2D.occ[0,0,:]/2
+        if any(EIGR2D.occ[0,0,:] == 2.0):
+            occtmp = EIGR2D.occ[0,0,:]/2
+        else:
+            occtmp = EIGR2D.occ[0,0,:]
 
         # nkpt, nband, nband
         delta_E = (np.einsum('ij,k->ijk', eig0[0,:,:].real, np.ones(nband))
@@ -398,7 +400,10 @@ def get_qpt_zp_self_energy(args, ddw, ddw_active, smearing, eig0, degen, omegase
     ddw_tmp = np.sum(ddw_addQ, axis=3)
 
     # nband
-    occtmp = EIGR2D.occ[0,0,:]/2
+    if any(EIGR2D.occ[0,0,:] == 2.0):
+        occtmp = EIGR2D.occ[0,0,:]/2
+    else:
+        occtmp = EIGR2D.occ[0,0,:]
 
     # nkpt, nband, nband
     delta_E_ddw = (np.einsum('ij,k->ijk', eig0[0,:,:].real, np.ones(nband))
