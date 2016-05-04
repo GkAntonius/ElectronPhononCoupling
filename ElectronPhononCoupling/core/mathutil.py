@@ -19,6 +19,8 @@ def get_bose(natom, omega, temperatures):
     if omega[imode].real > tol6:
       for tt, T in enumerate(temperatures):
         if T > tol6:
-          bose[imode,tt] = 1.0 / (N.exp(omega[imode].real / (kb_HaK*T)) - 1)
+          x = omega[imode].real / (kb_HaK*T)
+          if x < 50.:
+            bose[imode,tt] = 1.0 / (N.exp(x) - 1)
   return bose
 

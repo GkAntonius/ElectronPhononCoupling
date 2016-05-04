@@ -1,0 +1,19 @@
+1           # number of cpu
+1           # static
+output/t13  # output
+n           # do not compute temperature dependance
+y           # do compute lifetime
+3           # number of q-points
+../data_LiF/odat_calc_DS8_DDB.nc
+../data_LiF/odat_calc_DS12_DDB.nc
+../data_LiF/odat_calc_DS16_DDB.nc
+../data_LiF/odat_calc_DS9_EIG.nc
+../data_LiF/odat_calc_DS13_EIG.nc
+../data_LiF/odat_calc_DS17_EIG.nc
+../data_LiF/odat_calc_DS10_EIGR2D.nc
+../data_LiF/odat_calc_DS14_EIGR2D.nc
+../data_LiF/odat_calc_DS18_EIGR2D.nc
+../data_LiF/odat_calc_DS10_EIGI2D.nc
+../data_LiF/odat_calc_DS14_EIGI2D.nc
+../data_LiF/odat_calc_DS18_EIGI2D.nc
+../data_LiF/odat_calc_DS2_EIG.nc

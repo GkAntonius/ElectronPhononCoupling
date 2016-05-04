@@ -254,6 +254,7 @@ def static_zpm_lifetime(arguments, degen):
     warnings.warn("The real part of the broadening is non zero: {}".format(broadening))
 
   broadening = make_average(broadening, degen)
+
   #for ikpt in N.arange(nkpt):
   #  count = 0
   #  iband = 0
@@ -283,8 +284,8 @@ def static_zpm_temp_lifetime(arguments,ddw,temperatures,degen):
   nbqpt,wtq,eigq_files,DDB_files,EIGI2D_files = arguments
   DDB = DdbFile(DDB_files)
   EIGI2D = Eigr2dFile(EIGI2D_files)
-  total_corr =  zeros((3,len(temperatures),EIGI2D.nkpt,EIGI2D.nband),dtype=complex)
   eigq = EigFile(eigq_files)
+  broadening = zeros((len(temperatures),EIGI2D.nkpt,EIGI2D.nband),dtype=complex)
 
   # If the q-point mesh is homogenous, retreve the weight of the q-point
   if (wtq == 0):

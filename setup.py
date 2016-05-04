@@ -12,7 +12,7 @@ from distutils.core import setup
 #---------------------------------------------------------------------------
 
 # release.py contains version, authors, license, url, keywords, etc.
-release_file = os.path.join('ElectronPhononCoupling', 'setup', 'release.py')
+release_file = os.path.join('ElectronPhononCoupling', 'config', 'release.py')
 
 with open(release_file) as f:
     code = compile(f.read(), release_file, 'exec')
@@ -62,11 +62,11 @@ prune ElectronPhononCoupling/data/inputs-for-tests/output
 write_manifest()
 
 my_package_data = {
-        'ElectronPhononCoupling.data' : ['*-data/*', 'inputs-for-tests/*.*', 'outputs-of-tests/*'],
+        'ElectronPhononCoupling.data' : ['data_*/*', 'inputs_for_tests/*.*', 'outputs_of_tests/*'],
     }
 
 my_exclude_package_data = {
-        'ElectronPhononCoupling.data' : ['inputs-for-tests/ouput/*'],
+        'ElectronPhononCoupling.data' : ['inputs_for_tests/ouput/*'],
     }
 
 

@@ -103,8 +103,8 @@ class DdbFile(EpcFile):
         ipert = 0
         for ii in np.arange(self.natom):
           for dir1 in np.arange(3):
-           eigvect[ipert] = eigvect[ipert] * np.sqrt(me_amu / amu[ii])
-           ipert += 1
+            eigvect[ipert] = eigvect[ipert] * np.sqrt(me_amu / amu[ii])
+            ipert += 1
         kk = 0
         for jj in eigval:
           if jj < 0.0:

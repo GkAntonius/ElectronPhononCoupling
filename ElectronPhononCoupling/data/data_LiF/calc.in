@@ -1,0 +1,216 @@
+#== Datasets ==#
+ ndtset 18
+
+#== Basis set ==#
+ ecut 5.0
+
+#== Bands ==#
+ nband 8
+
+#== k-point grid ==#
+ kpt10    0.0000000000    0.0000000000    0.0000000000
+ kpt13    0.0000000000    0.0000000000    0.0000000000
+ kpt14    0.0000000000    0.0000000000    0.0000000000
+ kpt17    0.0000000000    0.0000000000    0.0000000000
+ kpt18    0.0000000000    0.0000000000    0.0000000000
+ kpt2    0.0000000000    0.0000000000    0.0000000000
+ kpt5    0.0000000000    0.0000000000    0.0000000000
+ kpt6    0.0000000000    0.0000000000    0.0000000000
+ kpt9    0.0000000000    0.0000000000    0.0000000000
+ kptopt 3
+ kptopt10 0
+ kptopt13 0
+ kptopt14 0
+ kptopt17 0
+ kptopt18 0
+ kptopt2 0
+ kptopt5 0
+ kptopt6 0
+ kptopt9 0
+ ngkpt 4 4 4
+ nkpt10 1
+ nkpt13 1
+ nkpt14 1
+ nkpt17 1
+ nkpt18 1
+ nkpt2 1
+ nkpt5 1
+ nkpt6 1
+ nkpt9 1
+
+#== Models ==#
+ ixc 1
+
+#== SCF procedure ==#
+ iscf 5
+ iscf10 -2
+ iscf11 -2
+ iscf13 -2
+ iscf14 -2
+ iscf15 -2
+ iscf17 -2
+ iscf18 -2
+ iscf2 -2
+ iscf3 -2
+ iscf5 -2
+ iscf6 -2
+ iscf7 -2
+ iscf9 -2
+ nstep 25
+ tolvrs 1e-10
+ tolvrs1 1e-10
+ tolwfr10 1e-14
+ tolwfr11 1e-06
+ tolwfr13 1e-06
+ tolwfr14 1e-14
+ tolwfr15 1e-06
+ tolwfr17 1e-06
+ tolwfr18 1e-14
+ tolwfr2 1e-14
+ tolwfr3 1e-14
+ tolwfr5 1e-14
+ tolwfr6 1e-14
+ tolwfr7 1e-06
+ tolwfr9 1e-06
+
+#== Response function ==#
+ bdeigrf10 -1
+ bdeigrf14 -1
+ bdeigrf18 -1
+ bdeigrf6 -1
+ elph2_imagden10 0.01 eV
+ elph2_imagden14 0.01 eV
+ elph2_imagden18 0.01 eV
+ elph2_imagden6 0.01 eV
+ ieig2rf1 0
+ ieig2rf10 4
+ ieig2rf11 0
+ ieig2rf13 0
+ ieig2rf14 4
+ ieig2rf15 0
+ ieig2rf17 0
+ ieig2rf18 4
+ ieig2rf2 0
+ ieig2rf3 0
+ ieig2rf5 0
+ ieig2rf6 4
+ ieig2rf7 0
+ ieig2rf9 0
+ rfatpol 1 2
+ rfdir 1 1 1
+ rfphon 1
+ rfphon1 0
+ rfphon11 0
+ rfphon13 0
+ rfphon15 0
+ rfphon17 0
+ rfphon2 0
+ rfphon3 0
+ rfphon5 0
+ rfphon7 0
+ rfphon9 0
+ smdelta10 1
+ smdelta14 1
+ smdelta18 1
+ smdelta6 1
+
+#== Parallelisation ==#
+ npfft 1
+
+#== Unit cell ==#
+ acell    7.703007915    7.703007915    7.703007915
+ natom 2
+ ntypat 2
+ rprim
+    0.0000000000    0.5000000000    0.5000000000
+    0.5000000000    0.0000000000    0.5000000000
+    0.5000000000    0.5000000000    0.0000000000
+ typat 1 2
+ xred
+    0.0000000000    0.0000000000    0.0000000000
+    0.5000000000    0.5000000000    0.5000000000
+ znucl 3 9
+
+#== Printing ==#
+ enunit 2
+
+#== Files ==#
+ get1den10 -2
+ get1den14 -2
+ get1den18 -2
+ get1den6 -2
+ getden1 0
+ getden11 1
+ getden13 1
+ getden15 1
+ getden17 1
+ getden2 1
+ getden3 1
+ getden5 1
+ getden7 1
+ getden9 1
+ getgam_eig2nkq10 6
+ getgam_eig2nkq14 6
+ getgam_eig2nkq18 6
+ getgam_eig2nkq6 0
+ getwfk1 0
+ getwfk10 2
+ getwfk12 1
+ getwfk14 2
+ getwfk16 1
+ getwfk18 2
+ getwfk4 1
+ getwfk6 2
+ getwfk8 1
+ getwfq10 -1
+ getwfq12 -1
+ getwfq14 -1
+ getwfq16 -1
+ getwfq18 -1
+ getwfq4 -1
+ getwfq6 -1
+ getwfq8 -1
+
+#== Other ==#
+ diemac 9.0
+ iqpt10 1
+ iqpt11 2
+ iqpt12 2
+ iqpt13 2
+ iqpt14 2
+ iqpt15 3
+ iqpt16 3
+ iqpt17 3
+ iqpt18 3
+ iqpt7 1
+ iqpt8 1
+ iqpt9 1
+ istwfk *1
+ ngqpt 2 2 2
+ nqpt 1
+ nqpt1 0
+ nqpt11 1
+ nqpt13 1
+ nqpt15 1
+ nqpt17 1
+ nqpt2 0
+ nqpt3 1
+ nqpt4 1
+ nqpt5 1
+ nqpt6 1
+ nqpt7 1
+ nqpt9 1
+ nshiftq 1
+ nsym 1
+ optforces 1
+ prtden1 1
+ qpt3    0.0000000000    0.0000000000    0.0000000000
+ qpt4    0.0000000000    0.0000000000    0.0000000000
+ qpt5    0.0000000000    0.0000000000    0.0000000000
+ qpt6    0.0000000000    0.0000000000    0.0000000000
+ qptopt 1
+ qptopt3 0
+ qptopt4 0
+ qptopt5 0
+ qptopt6 0
+ shiftq 0 0 0

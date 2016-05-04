@@ -277,7 +277,7 @@ class EPC_Analyzer(object):
         self.zero_point_broadening = total_brd
 
     def compute_dynamical_td_broadening(self):
-        warnings.warn("Dynamical lifetime is not yet implemented...proceed with static lifetime")
+        warnings.warn("Dynamical lifetime at finite temperature is not yet implemented...proceed with static lifetime")
         arguments = zip(self.iqpts, self.wtq, self.eigq_fnames, self.DDB_fnames, self.EIGI2D_fnames)
         partial_static_zpm_temp_lifetime = partial(static_zpm_temp_lifetime, ddw=self.ddw,
                                                    temperatures=self.temperatures, degen=self.degen)
