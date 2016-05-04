@@ -22,6 +22,7 @@ ElectronPhononCoupling/core/tdep.py
 ElectronPhononCoupling/core/util.py
 ElectronPhononCoupling/core/zpm.py
 ElectronPhononCoupling/data/__init__.py
+ElectronPhononCoupling/data/__init__.pyc
 ElectronPhononCoupling/data/diamond-rf-data/odat_calc_DS10_DDB
 ElectronPhononCoupling/data/diamond-rf-data/odat_calc_DS10_EIGI2D.nc
 ElectronPhononCoupling/data/diamond-rf-data/odat_calc_DS10_EIGR2D.nc

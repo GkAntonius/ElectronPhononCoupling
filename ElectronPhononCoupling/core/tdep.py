@@ -110,7 +110,10 @@ def dynamic_zpm_temp(arguments,ddw,ddw_active,calc_type,temperatures,smearing,ei
   ddw_addQ = N.einsum('ijklmno,plnkm->ijop',ddw_active,displ_red_DDW2)
 
   if calc_type == 2: 
-    occtmp = EIGR2D.occ[0,0,:]/2 # jband
+    if N.any(EIGR2D.occ[0,0,:] == 2.0):
+        occtmp = EIGR2D.occ[0,0,:]/2 # jband
+    else:
+        occtmp = EIGR2D.occ[0,0,:] # jband
     delta_E_ddw = N.einsum('ij,k->ijk',eig0[0,:,:].real,N.ones(EIGR2D.nband)) - \
               N.einsum('ij,k->ikj',eig0[0,:,:].real,N.ones(EIGR2D.nband)) - \
               N.einsum('ij,k->ijk',N.ones((EIGR2D.nkpt,EIGR2D.nband)),(2*occtmp-1))*smearing*1j
@@ -120,17 +123,29 @@ def dynamic_zpm_temp(arguments,ddw,ddw_active,calc_type,temperatures,smearing,ei
     delta_E = N.einsum('ij,k->ijk',eig0[0,:,:].real,N.ones(EIGR2D.nband)) - \
               N.einsum('ij,k->ikj',eigq.EIG[0,:,:].real,N.ones(EIGR2D.nband)) - \
               N.einsum('ij,k->ijk',N.ones((EIGR2D.nkpt,EIGR2D.nband)),(2*occtmp-1))*smearing*1j # ikpt,iband,jband
-    omegatmp = omega[:].real # imode
+    omegatmp = DDB.omega[:].real # imode
+
     num1 = N.einsum('ij,k->ijk',bose,N.ones(EIGR2D.nband)) +1.0 \
           - N.einsum('ij,k->ijk',N.ones((3*EIGR2D.natom,len(temperatures))),occtmp) #imode,tmp,jband
     deno1 = N.einsum('ijk,l->ijkl',delta_E,N.ones(3*EIGR2D.natom)) \
           - N.einsum('ijk,l->ijkl',N.ones((EIGR2D.nkpt,EIGR2D.nband,EIGR2D.nband)),omegatmp) #ikpt,iband,jband,imode
-    div1 = N.einsum('ijk,lmki->ijklm',num1,1.0/deno1) # (imode,tmp,jband)/(ikpt,iband,jband,imode) ==> imode,tmp,jband,ikpt,iband
+    #div1 = N.einsum('ijk,lmki->ijklm',num1,1.0/deno1) # (imode,tmp,jband)/(ikpt,iband,jband,imode) ==> imode,tmp,jband,ikpt,iband
+    # BEGIN DEBUG
+    #D = (N.real(deno1) ** 2 + N.imag(deno1) ** 2)
+    #if N.any(D < 1e-10):
+    #    print('Too small value of denominator: ', deno1)
+    # END DEBUG
+    invdeno1 = N.real(deno1) / (N.real(deno1) ** 2 + N.imag(deno1) ** 2)
+    div1 = N.einsum('ijk,lmki->ijklm',num1,invdeno1) # (imode,tmp,jband)/(ikpt,iband,jband,imode) ==> imode,tmp,jband,ikpt,iband
+
     num2 = N.einsum('ij,k->ijk',bose,N.ones(EIGR2D.nband)) \
           + N.einsum('ij,k->ijk',N.ones((3*EIGR2D.natom,len(temperatures))),occtmp) #imode,tmp,jband
     deno2 = N.einsum('ijk,l->ijkl',delta_E,N.ones(3*EIGR2D.natom)) \
           + N.einsum('ijk,l->ijkl',N.ones((EIGR2D.nkpt,EIGR2D.nband,EIGR2D.nband)),omegatmp) #ikpt,iband,jband,imode
-    div2 = N.einsum('ijk,lmki->ijklm',num2,1.0/deno2) # (imode,tmp,jband)/(ikpt,iband,jband,imode) ==> imode,tmp,jband,ikpt,iband
+    #div2 = N.einsum('ijk,lmki->ijklm',num2,1.0/deno2) # (imode,tmp,jband)/(ikpt,iband,jband,imode) ==> imode,tmp,jband,ikpt,iband
+    invdeno2 = N.real(deno2) / (N.real(deno2) ** 2 + N.imag(deno2) ** 2)
+    div2 = N.einsum('ijk,lmki->ijklm',num2,invdeno2) # (imode,tmp,jband)/(ikpt,iband,jband,imode) ==> imode,tmp,jband,ikpt,iband
+
     fan_add = N.einsum('ijkl,lmkij->mij',fan_addQ,div1+div2) # ikpt,iband,jband,imode
 
   elif calc_type ==3:
@@ -141,6 +156,7 @@ def dynamic_zpm_temp(arguments,ddw,ddw_active,calc_type,temperatures,smearing,ei
     num = N.einsum('ij,klm->ijklm',2*bose+1.0,delta_E)  # imode,tmp,ikpt,iband,jband
     deno = delta_E**2 +smearing**2 # ikpt,iband,jband
     div =  N.einsum('ijklm,klm->ijklm',num,1.0/deno)   # imode,tmp,ikpt,iband,jband 
+
     fan_add = N.einsum('ijkl,lmijk->mij',fan_addQ,div) #(ikpt,iband,jband,imode),(imode,tmp,ikpt,iband,jband)->tmp,ikpt,iband
 
     num = N.einsum('ij,klm->ijklm',2*bose+1.0,delta_E_ddw) # imode,tmp,ikpt,iband,jband

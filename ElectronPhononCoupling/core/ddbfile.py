@@ -141,7 +141,7 @@ class DdbFile(EpcFile):
     #        self.E2D = zeros((3,self.natom,3,self.natom),dtype=complex)
 
     # TODO clean up
-    def compute_dynmat(self):
+    def compute_dynmat(self, asr=True):
         """
         Diagonalize the dynamical matrix.
     
@@ -215,10 +215,11 @@ class DdbFile(EpcFile):
         # Moreover with the translational invariance the ZPM will be 0 anyway for these
         # modes but the FAN and DDW will have a non physical value. We should therefore 
         # neglect these values.
-        #  if np.allclose(self.iqpt,[0.0,0.0,0.0]) == True:
-        #    omega[0] = 0.0
-        #    omega[1] = 0.0
-        #    omega[2] = 0.0
+        if asr:
+          if np.allclose(self.qred,[0.0,0.0,0.0]):
+            omega[0] = 0.0
+            omega[1] = 0.0
+            omega[2] = 0.0
 
         self.omega = omega
         self.eigvect = eigvect
@@ -240,6 +241,7 @@ class DdbFile(EpcFile):
         displ_red_DDW2 = zeros((3*natom,natom,natom,3,3),dtype=complex)
         for imode in np.arange(3*natom): #Loop on perturbation (6 for 2 atoms)
           if omega[imode].real > tol6:
+          #if omega[imode].real > 1.5e-4:  # GKA DEBUG
             for iatom1 in np.arange(natom):
               for iatom2 in np.arange(natom):
                 for idir1 in np.arange(0,3):
