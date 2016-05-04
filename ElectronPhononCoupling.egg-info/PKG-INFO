@@ -1,6 +1,6 @@
 Metadata-Version: 1.0
 Name: ElectronPhononCoupling
-Version: 2.4.2
+Version: 2.5.0
 Summary: Python module to analyze electron-phonon related quantities.
 Home-page: http://abinit.org
 Author: The ABINIT group
