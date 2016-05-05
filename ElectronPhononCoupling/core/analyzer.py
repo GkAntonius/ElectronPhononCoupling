@@ -8,15 +8,13 @@ import multiprocessing
 from functools import partial
 
 import numpy as np
-from numpy import zeros
 import netCDF4 as nc
 
-from .constants import tol6, tol8, Ha2eV, kb_HaK
+from .constants import Ha2eV
 
-from .degenerate import get_degen, make_average, symmetrize_fan_degen
+from .degenerate import get_degen
 from .util import create_directory, formatted_array_lines
 
-from .mathutil import delta_lorentzian
 from .tdep import (static_zpm_temp, dynamic_zpm_temp, static_zpm_lifetime, 
                    static_zpm_temp_lifetime)
 from .zpm import (get_qpt_zpr_static, get_qpt_zpr_dynamical,
