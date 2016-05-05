@@ -54,7 +54,6 @@ def get_degen(eigens):
         group = list()
         last_ispin, last_iband, last_eig = 0, 0, -float('inf')
 
-        #for ispin, iband, eig in iter_spin_band_eig(eigens, ikpt):
         for sbe in iter_spin_band_eig(eigens, ikpt):
             ispin, iband, eig = sbe
 

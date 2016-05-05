@@ -9,11 +9,11 @@ __all__ = ['EpcFile']
 class EpcFile(object):
     """Base class for netCDF files used by EPC."""
 
-    def __init__(self, fname, read=True):
+    def __init__(self, fname=None, read=True):
 
         self.fname = fname
 
-        if read:
+        if read and self.fname:
             self.read_nc()
     
     def read_nc(self, fname=None):
