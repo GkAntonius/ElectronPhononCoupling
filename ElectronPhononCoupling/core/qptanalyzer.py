@@ -1,11 +1,9 @@
 from __future__ import print_function
 
 import numpy as np
-from numpy import zeros
+from numpy import zeros, ones, einsum
 
 from .constants import tol6, tol8, Ha2eV, kb_HaK
-
-from .degenerate import make_average, symmetrize_fan_degen
 
 from .mathutil import delta_lorentzian
 from . import EigFile, Eigr2dFile, FanFile, DdbFile
@@ -53,16 +51,16 @@ class QptAnalyzer(object):
         displ_red_FAN2, displ_red_DDW2 = self.ddb.get_reduced_displ()
     
         # Sum over (idir, iat, jdir, jat) to obtain (nmode, nkpt, nband)
-        fan = np.einsum('ijklmn,olnkm->oij', self.eigr2d.EIG2D, displ_red_FAN2)
-        ddw = np.einsum('ijklmn,olnkm->oij', self.eigr2d0.EIG2D, displ_red_DDW2)  
+        fan_term = einsum('ijklmn,olnkm->oij', self.eigr2d.EIG2D, displ_red_FAN2)
+        ddw_term = einsum('ijklmn,olnkm->oij', self.eigr2d0.EIG2D, displ_red_DDW2)  
     
         # Sum all modes
-        fan = np.sum(fan, axis=0)
-        ddw = np.sum(ddw, axis=0)
+        fan_term = np.sum(fan_term, axis=0)
+        ddw_term = np.sum(ddw_term, axis=0)
     
-        self.zpr[0,:,:] = (fan[:,:] - ddw[:,:]) * self.wtq
-        self.zpr[1,:,:] = fan[:,:] * self.wtq
-        self.zpr[2,:,:] = ddw[:,:] * self.wtq
+        self.zpr[0,:,:] = (fan_term[:,:] - ddw_term[:,:]) * self.wtq
+        self.zpr[1,:,:] = fan_term[:,:] * self.wtq
+        self.zpr[2,:,:] = ddw_term[:,:] * self.wtq
     
         self.zpr = self.eig0.make_average(self.zpr)
     
@@ -91,8 +89,8 @@ class QptAnalyzer(object):
         # First compute Sternheimer space
       
         # nkpt, nband, nmode
-        fan_stern = np.einsum('ijklmn,olnkm->oij', self.eigr2d.EIG2D, displ_red_FAN2)
-        ddw_stern = np.einsum('ijklmn,olnkm->oij', self.eigr2d0.EIG2D, displ_red_DDW2)
+        fan_stern = einsum('ijklmn,olnkm->oij', self.eigr2d.EIG2D, displ_red_FAN2)
+        ddw_stern = einsum('ijklmn,olnkm->oij', self.eigr2d0.EIG2D, displ_red_DDW2)
       
         fan_term = np.sum(fan_stern, axis=0)
         ddw_term = np.sum(ddw_stern, axis=0)
@@ -100,8 +98,8 @@ class QptAnalyzer(object):
         # Now compute active space
       
         # nkpt, nband, nband, nmode
-        fan_addQ = np.einsum('ijklmno,plnkm->ijop', self.fan.FAN, displ_red_FAN2) 
-        ddw_addQ = np.einsum('ijklmno,plnkm->ijop', self.fan0.FAN, displ_red_DDW2) 
+        fan_addQ = einsum('ijklmno,plnkm->ijop', self.fan.FAN, displ_red_FAN2) 
+        ddw_addQ = einsum('ijklmno,plnkm->ijop', self.fan0.FAN, displ_red_DDW2) 
     
         # Enforce the diagonal coupling terms to be zero at Gamma
         ddw_addQ = self.eig0.symmetrize_fan_degen(ddw_addQ)
@@ -114,24 +112,24 @@ class QptAnalyzer(object):
         ddw_tmp = np.sum(ddw_addQ, axis=3)
       
         # nkpt, nband, nband
-        delta_E = (np.einsum('ij,k->ijk', self.eig0.EIG[0,:,:].real, np.ones(nband))
-                 - np.einsum('ij,k->ikj', self.eigq.EIG[0,:,:].real, np.ones(nband)))
+        delta_E = (einsum('ij,k->ijk', self.eig0.EIG[0,:,:].real, ones(nband))
+                 - einsum('ij,k->ikj', self.eigq.EIG[0,:,:].real, ones(nband)))
     
         # nkpt, nband, nband
-        delta_E_ddw = (np.einsum('ij,k->ijk', self.eig0.EIG[0,:,:].real, np.ones(nband))
-                     - np.einsum('ij,k->ikj', self.eig0.EIG[0,:,:].real, np.ones(nband)))
+        delta_E_ddw = (einsum('ij,k->ijk', self.eig0.EIG[0,:,:].real, ones(nband))
+                     - einsum('ij,k->ikj', self.eig0.EIG[0,:,:].real, ones(nband)))
     
         # nkpt, nband, nband
         div =  delta_E / (delta_E ** 2 + self.smearing ** 2)
     
         # nkpt, nband
-        fan_active = np.einsum('ijk,ijk->ij', fan_tmp, div)
+        fan_active = einsum('ijk,ijk->ij', fan_tmp, div)
     
         # nkpt, nband, nband
         div_ddw = delta_E_ddw / (delta_E_ddw ** 2 + self.smearing ** 2)
     
         # nkpt, nband
-        ddw_active = np.einsum('ijk,ijk->ij', ddw_tmp, div_ddw)
+        ddw_active = einsum('ijk,ijk->ij', ddw_tmp, div_ddw)
     
       
         # Correction from active space 
@@ -169,8 +167,8 @@ class QptAnalyzer(object):
         # First compute Sternheimer space
       
         # nkpt, nband, nmode
-        fan_stern = np.einsum('ijklmn,olnkm->oij', self.eigr2d.EIG2D, displ_red_FAN2)
-        ddw_stern = np.einsum('ijklmn,olnkm->oij', self.eigr2d0.EIG2D, displ_red_DDW2)
+        fan_stern = einsum('ijklmn,olnkm->oij', self.eigr2d.EIG2D, displ_red_FAN2)
+        ddw_stern = einsum('ijklmn,olnkm->oij', self.eigr2d0.EIG2D, displ_red_DDW2)
       
         fan_term = np.sum(fan_stern, axis=0)
         ddw_term = np.sum(ddw_stern, axis=0)
@@ -178,8 +176,8 @@ class QptAnalyzer(object):
         # Now compute active space
       
         # nkpt, nband, nband, nmode
-        fan_addQ = np.einsum('ijklmno,plnkm->ijop', self.fan.FAN, displ_red_FAN2) 
-        ddw_addQ = np.einsum('ijklmno,plnkm->ijop', self.fan0.FAN, displ_red_DDW2) 
+        fan_addQ = einsum('ijklmno,plnkm->ijop', self.fan.FAN, displ_red_FAN2) 
+        ddw_addQ = einsum('ijklmno,plnkm->ijop', self.fan0.FAN, displ_red_DDW2) 
     
         # Enforce the diagonal coupling terms to be zero at Gamma
         ddw_addQ = self.eig0.symmetrize_fan_degen(ddw_addQ)
@@ -197,17 +195,17 @@ class QptAnalyzer(object):
             occ = self.eigr2d.occ[0,0,:]
     
         # nkpt, nband, nband
-        delta_E = (np.einsum('ij,k->ijk', eig0[0,:,:].real, np.ones(nband))
-                 - np.einsum('ij,k->ikj', eigq.EIG[0,:,:].real, np.ones(nband))
-                 - np.einsum('ij,k->ijk', np.ones((nkpt,nband)), (2*occ-1)) * self.smearing * 1j)
+        delta_E = (einsum('ij,k->ijk', eig0[0,:,:].real, ones(nband))
+                 - einsum('ij,k->ikj', eigq.EIG[0,:,:].real, ones(nband))
+                 - einsum('ij,k->ijk', ones((nkpt,nband)), (2*occ-1)) * self.smearing * 1j)
     
         # nkpt, nband, nband
-        delta_E_ddw = (np.einsum('ij,k->ijk', eig0[0,:,:].real, np.ones(nband))
-                     - np.einsum('ij,k->ikj', eig0[0,:,:].real, np.ones(nband))
-                     - np.einsum('ij,k->ijk', np.ones((nkpt,nband)), (2*occ-1)) * self.smearing * 1j)
+        delta_E_ddw = (einsum('ij,k->ijk', eig0[0,:,:].real, ones(nband))
+                     - einsum('ij,k->ikj', eig0[0,:,:].real, ones(nband))
+                     - einsum('ij,k->ijk', ones((nkpt,nband)), (2*occ-1)) * self.smearing * 1j)
     
         # nkpt, nband
-        ddw_active = np.einsum('ijk,ijk->ij', ddw_tmp, 1.0 / delta_E_ddw)
+        ddw_active = einsum('ijk,ijk->ij', ddw_tmp, 1.0 / delta_E_ddw)
     
         # nmode
         omega = self.ddb.omega[:].real
@@ -216,21 +214,21 @@ class QptAnalyzer(object):
         num1 = 1.0 - occ
     
         # nkpt, nband, nband, nmode
-        deno1 = (np.einsum('ijk,l->ijkl', delta_E, np.ones(3*natom))
-               - np.einsum('ijk,l->ijkl', np.ones((nkpt,nband,nband)), omega))
+        deno1 = (einsum('ijk,l->ijkl', delta_E, ones(3*natom))
+               - einsum('ijk,l->ijkl', ones((nkpt,nband,nband)), omega))
     
         # nmode, nband, nkpt, nband
-        div1 = np.einsum('i,jkil->lijk', num1, 1.0 / deno1)
+        div1 = einsum('i,jkil->lijk', num1, 1.0 / deno1)
     
         # nkpt, nband, nband, nmode
-        deno2 = (np.einsum('ijk,l->ijkl', delta_E, np.ones(3*natom))
-               + np.einsum('ijk,l->ijkl', np.ones((nkpt,nband,nband)), omega))
+        deno2 = (einsum('ijk,l->ijkl', delta_E, ones(3*natom))
+               + einsum('ijk,l->ijkl', ones((nkpt,nband,nband)), omega))
     
         # nmode, nband, nkpt, nband
-        div2 = np.einsum('i,jkil->lijk', occ, 1.0 / deno2)
+        div2 = einsum('i,jkil->lijk', occ, 1.0 / deno2)
     
         # nkpt, nband
-        fan_active = np.einsum('ijkl,lkij->ij', fan_addQ, div1 + div2)
+        fan_active = einsum('ijkl,lkij->ij', fan_addQ, div1 + div2)
     
       
         # Correction from active space 
@@ -272,39 +270,39 @@ class QptAnalyzer(object):
         fan_add  = zeros((nkpt,nband), dtype=complex)
       
         # nkpt, nband, nband, nmode
-        fan_addQ = np.einsum('ijklmno,plnkm->ijop', self.fan.FAN, displ_red_FAN2) 
+        fan_addQ = einsum('ijklmno,plnkm->ijop', self.fan.FAN, displ_red_FAN2) 
     
         # Enforce the diagonal coupling terms to be zero at Gamma
         if self.is_gamma:
             fan_addQ = self.eig0.symmetrize_fan_degen(fan_addQ)
       
         # nkpt, nband, nband
-        delta_E = (np.einsum('ij,k->ijk', self.eig0.EIG[0,:,:].real, np.ones(nband))
-                 - np.einsum('ij,k->ikj', self.eigq.EIG[0,:,:].real, np.ones(nband)))
+        delta_E = (einsum('ij,k->ijk', self.eig0.EIG[0,:,:].real, ones(nband))
+                 - einsum('ij,k->ikj', self.eigq.EIG[0,:,:].real, ones(nband)))
     
         # nband
         num1 = - (1. - occ) * (2 * occ - 1.)
         num2 = - occ * (2 * occ - 1.)
     
         # nkpt, nband, nband, nmode
-        deno1 = (np.einsum('ijk,l->ijkl', delta_E, np.ones(3*natom))
-               - np.einsum('ijk,l->ijkl', np.ones((nkpt,nband,nband)), omega))
+        deno1 = (einsum('ijk,l->ijkl', delta_E, ones(3*natom))
+               - einsum('ijk,l->ijkl', ones((nkpt,nband,nband)), omega))
 
         delta1 =  np.pi * delta_lorentzian(deno1, self.smearing)
     
         # nkpt, nband, nband, nmode
-        deno2 = (np.einsum('ijk,l->ijkl', delta_E, np.ones(3*natom))
-               + np.einsum('ijk,l->ijkl', np.ones((nkpt,nband,nband)), omega))
+        deno2 = (einsum('ijk,l->ijkl', delta_E, ones(3*natom))
+               + einsum('ijk,l->ijkl', ones((nkpt,nband,nband)), omega))
 
         delta2 = np.pi * delta_lorentzian(deno2, self.smearing)
 
-        term1 = np.einsum('i,jkil->lijk', num1, delta1)
-        term2 = np.einsum('i,jkil->lijk', num2, delta2)
+        term1 = einsum('i,jkil->lijk', num1, delta1)
+        term2 = einsum('i,jkil->lijk', num2, delta2)
 
         deltas = term1 + term2
 
         # nkpt, nband
-        fan_add = np.einsum('ijkl,lkij->ij', fan_addQ, deltas)
+        fan_add = einsum('ijkl,lkij->ij', fan_addQ, deltas)
 
         # Correction from active space 
         self.zpb = fan_add[:,:] * self.wtq
@@ -339,15 +337,15 @@ class QptAnalyzer(object):
         fan_add  = zeros((nkpt,nband), dtype=complex)
     
         # nkpt, nband, nband, nmode
-        fan_addQ = np.einsum('ijklmno,plnkm->ijop', self.fan.FAN, displ_red_FAN2) 
+        fan_addQ = einsum('ijklmno,plnkm->ijop', self.fan.FAN, displ_red_FAN2) 
       
         # Enforce the diagonal coupling terms to be zero at Gamma
-        if iqpt == 0:
-            fan_addQ = symmetrize_fan_degen(fan_addQ, degen)
+        if self.is_gamma:
+            fan_addQ = self.eig0.symmetrize_fan_degen(fan_addQ)
       
         # nkpt, nband, nband
-        delta_E = (np.einsum('ij,k->ijk', self.eig0.EIG[0,:,:].real, np.ones(nband))
-                 - np.einsum('ij,k->ikj', self.eigq.EIG[0,:,:].real, np.ones(nband)))
+        delta_E = (einsum('ij,k->ijk', self.eig0.EIG[0,:,:].real, ones(nband))
+                 - einsum('ij,k->ikj', self.eigq.EIG[0,:,:].real, ones(nband)))
     
         # nband
         num = - (2 * occ - 1.)
@@ -356,10 +354,10 @@ class QptAnalyzer(object):
         delta =  np.pi * delta_lorentzian(delta_E, smearing)
     
         # nband, nkpt, nband
-        deltasign = np.einsum('i,jki->ijk', num, delta)
+        deltasign = einsum('i,jki->ijk', num, delta)
     
         # nkpt, nband
-        fan_add = np.einsum('ijkl,kij->ij', fan_addQ, deltasign)
+        fan_add = einsum('ijkl,kij->ij', fan_addQ, deltasign)
       
         # Correction from active space 
         self.zpb = fan_add[:,:] * self.wtq
@@ -398,9 +396,9 @@ class QptAnalyzer(object):
         ddw_add  = zeros((nkpt,nband), dtype=complex)
       
         # fan_corrQ and ddw_corrQ contains the ZPR on Sternheimer space.
-        fan_corrQ = np.einsum('ijklmn,olnkm->oij', self.eigr2d.EIG2D, displ_red_FAN2)
-        fan_corrQ = np.einsum('oij,m->omij', fan_corrQ, np.ones(nomegase))
-        ddw_corrQ = np.einsum('ijklmn,olnkm->oij', self.eigr2d0.EIG2D, displ_red_DDW2)
+        fan_corrQ = einsum('ijklmn,olnkm->oij', self.eigr2d.EIG2D, displ_red_FAN2)
+        fan_corrQ = einsum('oij,m->omij', fan_corrQ, ones(nomegase))
+        ddw_corrQ = einsum('ijklmn,olnkm->oij', self.eigr2d0.EIG2D, displ_red_DDW2)
       
         # Sum Sternheimer (upper) contribution
         fan_term = np.sum(fan_corrQ,axis=0)
@@ -409,8 +407,8 @@ class QptAnalyzer(object):
         # Now compute active space
       
         # nkpt, nband, nband, nmode
-        fan_addQ = np.einsum('ijklmno,plnkm->ijop', self.fan.FAN, displ_red_FAN2) 
-        ddw_addQ = np.einsum('ijklmno,plnkm->ijop', self.fan0.FAN, displ_red_DDW2) 
+        fan_addQ = einsum('ijklmno,plnkm->ijop', self.fan.FAN, displ_red_FAN2) 
+        ddw_addQ = einsum('ijklmno,plnkm->ijop', self.fan0.FAN, displ_red_DDW2) 
     
         # Enforce the diagonal coupling terms to be zero at Gamma
         ddw_addQ = self.eig0.symmetrize_fan_degen(ddw_addQ)
@@ -428,12 +426,12 @@ class QptAnalyzer(object):
             occ = self.eigr2d.occ[0,0,:]
     
         # nkpt, nband, nband
-        delta_E_ddw = (np.einsum('ij,k->ijk', eig0[0,:,:].real, np.ones(nband))
-                     - np.einsum('ij,k->ikj', eig0[0,:,:].real, np.ones(nband))
-                     - np.einsum('ij,k->ijk', np.ones((nkpt,nband)), (2*occ-1)) * smearing * 1j)
+        delta_E_ddw = (einsum('ij,k->ijk', eig0[0,:,:].real, ones(nband))
+                     - einsum('ij,k->ikj', eig0[0,:,:].real, ones(nband))
+                     - einsum('ij,k->ijk', ones((nkpt,nband)), (2*occ-1)) * smearing * 1j)
     
         # nkpt, nband
-        ddw_add = np.einsum('ijk,ijk->ij', ddw_tmp, 1.0 / delta_E_ddw)
+        ddw_add = einsum('ijk,ijk->ij', ddw_tmp, 1.0 / delta_E_ddw)
     
         # nband
         num1 = 1.0 - occ
@@ -446,36 +444,36 @@ class QptAnalyzer(object):
             # nkpt, nband
             # delta_E[ikpt,jband] = E[ikpt,jband] - E[ikpt,kband] - (2f[kband] -1) * eta * 1j
             delta_E = (self.eig0.EIG[0,:,:].real
-                     - np.einsum('i,j->ij', self.eigq.EIG[0,:,kband].real, np.ones(nband))
-                     - np.ones((nkpt,nband)) * (2*occ[kband]-1) * smearing * 1j)
+                     - einsum('i,j->ij', self.eigq.EIG[0,:,kband].real, ones(nband))
+                     - ones((nkpt,nband)) * (2*occ[kband]-1) * smearing * 1j)
     
             # nkpt, nband, nomegase
             # delta_E_omega[ikpt,jband,lomega] = omega[lomega] + E[ikpt,jband] - E[ikpt,kband] - (2f[kband] -1) * eta * 1j
-            delta_E_omega = (np.einsum('ij,l->ijl', delta_E, np.ones(nomegase))
-                           + np.einsum('ij,l->ijl', np.ones((nkpt,nband)), omegase))
+            delta_E_omega = (einsum('ij,l->ijl', delta_E, ones(nomegase))
+                           + einsum('ij,l->ijl', ones((nkpt,nband)), omegase))
     
             # nkpt, nband, nomegase, nmode
-            deno1 = (np.einsum('ijl,m->ijlm', delta_E_omega, np.ones(3*natom))
-                   - np.einsum('ijl,m->ijlm', np.ones((nkpt,nband,nomegase)), omega))
+            deno1 = (einsum('ijl,m->ijlm', delta_E_omega, ones(3*natom))
+                   - einsum('ijl,m->ijlm', ones((nkpt,nband,nomegase)), omega))
     
             # nmode, nkpt, nband, nomegase
-            div1 = num1[kband] * np.einsum('ijlm->mijl', 1.0 / deno1)
+            div1 = num1[kband] * einsum('ijlm->mijl', 1.0 / deno1)
     
             del deno1
     
             # nkpt, nband, nomegase, nmode
-            deno2 = (np.einsum('ijl,m->ijlm', delta_E_omega, np.ones(3*natom))
-                   + np.einsum('ijl,m->ijlm', np.ones((nkpt,nband,nomegase)), omega))
+            deno2 = (einsum('ijl,m->ijlm', delta_E_omega, ones(3*natom))
+                   + einsum('ijl,m->ijlm', ones((nkpt,nband,nomegase)), omega))
     
             del delta_E_omega
     
             # nmode, nkpt, nband, nomegase
-            div2 = occ[kband] * np.einsum('ijlm->mijl', 1.0 / deno2)
+            div2 = occ[kband] * einsum('ijlm->mijl', 1.0 / deno2)
     
             del deno2
     
             # nomegase, nkpt, nband
-            fan_add += np.einsum('ijm,mijl->lij', fan_addQ[:,:,kband,:], div1 + div2)
+            fan_add += einsum('ijm,mijl->lij', fan_addQ[:,:,kband,:], div1 + div2)
     
             del div1, div2
       
@@ -483,12 +481,12 @@ class QptAnalyzer(object):
         # Correction from active space 
         fan_term += fan_add
         ddw_term += ddw_add
-        ddw_term = np.einsum('ij,m->mij', ddw_term, np.ones(nomegase))
+        ddw_term = einsum('ij,m->mij', ddw_term, ones(nomegase))
     
         self.sigma = (fan_term[:,:,:] - ddw_term[:,:,:]) * self.wtq
     
         self.sigma = self.eig0.make_average(qpt_sigma)
-        self.sigma = np.einsum('mij->ijm', qpt_sigma)
+        self.sigma = einsum('mij->ijm', qpt_sigma)
       
         return self.sigma
 
