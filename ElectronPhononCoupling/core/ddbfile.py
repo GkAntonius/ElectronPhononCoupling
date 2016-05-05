@@ -10,13 +10,14 @@ import numpy as np
 from numpy import zeros
 import netCDF4 as nc
 
-from .constants import tol6
+from .constants import tol6, me_amu
 from . import EpcFile
 
-# Electron mass over atomical mass unit
-me_amu = 5.4857990965007152E-4
-
 class DdbFile(EpcFile):
+
+    _rprim = np.identity(3)
+    gprimd = np.identity(3)
+    omega = None
     
     def read_nc(self, fname=None):
         """Open the DDB.nc file and read it."""
@@ -27,9 +28,6 @@ class DdbFile(EpcFile):
             self.natom = len(root.dimensions['number_of_atoms'])
             self.ncart = len(root.dimensions['number_of_cartesian_directions'])  # 3
             self.ntypat = len(root.dimensions['number_of_atom_species'])
-            #self.nkpt = len(root.dimensions['number_of_kpoints'])  # Not relevant
-            #self.nband = len(root.dimensions['max_number_of_states'])  # Not even there
-            #self.nsppol = len(root.dimensions['number_of_spins'])  # Not relevant
 
             self.typat = root.variables['atom_species'][:self.natom]
             self.amu = root.variables['atomic_masses_amu'][:self.ntypat]
@@ -44,7 +42,19 @@ class DdbFile(EpcFile):
 
             self.BECT = root.variables['born_effective_charge_tensor'][:self.ncart,:self.natom,:self.ncart]
 
-    # TODO clean up
+    @property
+    def is_gamma(self):
+        return np.allclose(self.qred,[0.0,0.0,0.0])
+
+    @property
+    def rprim(self):
+        return self._rprim
+
+    @rprim.setter
+    def rprim(self, value):
+        self._rprim = np.array(value)
+        self.gprimd = np.linalg.inv(np.matrix(self._rprim))
+
     def compute_dynmat(self, asr=True):
         """
         Diagonalize the dynamical matrix.
@@ -52,7 +62,6 @@ class DdbFile(EpcFile):
         Returns:
           omega: the frequencies, in Ha
           eigvect: the eigenvectors, in reduced coord
-          gprimd: the primitive reciprocal space vectors
         """
     
         # Retrive the amu for each atom
@@ -60,9 +69,6 @@ class DdbFile(EpcFile):
         for ii in np.arange(self.natom):
           jj = self.typat[ii]
           amu[ii] = self.amu[jj-1]
-    
-        # Calcul of gprimd from rprim
-        gprimd = np.linalg.inv(np.matrix(self.rprim))
     
         # Transform from 2nd-order matrix (non-cartesian coordinates, 
         # masses not included, asr not included ) from self to
@@ -75,22 +81,20 @@ class DdbFile(EpcFile):
                 for dir3 in np.arange(3):
                   for dir4 in np.arange(3):
                     E2D_cart[dir1,ii,dir2,jj] += (self.E2D[ii,dir3,jj,dir4] *
-                                                  gprimd[dir1,dir3] * gprimd[dir2,dir4])
+                            self.gprimd[dir1,dir3] * self.gprimd[dir2,dir4])
     
-        # Reduce the 4 dimensional E2D_cart matrice to 2 dimensional Dynamical matrice.
-        ipert1 = 0
+        # Reduce the 4 dimensional E2D_cart matrice to 2 dimensional Dynamical matrice
+        # with scaled masses.
         Dyn_mat = zeros((3*self.natom,3*self.natom),dtype=complex)
-        while ipert1 < 3*self.natom:
-          for ii in np.arange(self.natom):
-            for dir1 in np.arange(3):
-              ipert2 = 0
-              while ipert2 < 3*self.natom:
-                for jj in np.arange(self.natom):
-                  for dir2 in np.arange(3):
-                    Dyn_mat[ipert1,ipert2] = (E2D_cart[dir1,ii,dir2,jj] * me_amu / 
-                                              np.sqrt(amu[ii]*amu[jj]))
-                    ipert2 += 1
-              ipert1 += 1
+        for ii in np.arange(self.natom):
+          for dir1 in np.arange(3):
+            ipert1 = ii * 3 + dir1
+            for jj in np.arange(self.natom):
+              for dir2 in np.arange(3):
+                ipert2 = jj * 3 + dir2
+
+                Dyn_mat[ipert1,ipert2] = (E2D_cart[dir1,ii,dir2,jj] *
+                                          me_amu / np.sqrt(amu[ii]*amu[jj]))
     
         # Hermitianize the dynamical matrix
         dynmat = np.matrix(Dyn_mat)
@@ -99,37 +103,29 @@ class DdbFile(EpcFile):
         # Diagonalize the matrix
         eigval, eigvect = np.linalg.eigh(Dyn_mat)
     
-        # Orthonormality relation 
-        ipert = 0
+        # Scale the eigenvectors 
         for ii in np.arange(self.natom):
           for dir1 in np.arange(3):
+            ipert = ii * 3 + dir1
             eigvect[ipert] = eigvect[ipert] * np.sqrt(me_amu / amu[ii])
-            ipert += 1
-        kk = 0
-        for jj in eigval:
-          if jj < 0.0:
-            warnings.warn("An eigenvalue is negative with value: {} ... but proceed with value 0.0".format(jj))
-            eigval[kk] = 0.0
-            kk += 1
-          else:
-            kk += 1
-        omega = np.sqrt(eigval)  #  * me_amu
-    
-        # The acoustic phonon at Gamma should NOT contribute because they should be zero.
-        # Moreover with the translational invariance the ZPM will be 0 anyway for these
-        # modes but the FAN and DDW will have a non physical value. We should therefore 
-        # neglect these values.
-        if asr:
-          if np.allclose(self.qred,[0.0,0.0,0.0]):
-            omega[0] = 0.0
-            omega[1] = 0.0
-            omega[2] = 0.0
 
-        self.omega = omega
+        # Nullify imaginary frequencies
+        for i, eig in enumerate(eigval):
+          if eig < 0.0:
+            warnings.warn("An eigenvalue is negative with value: {} ... but proceed with value 0.0".format(jj))
+            eigval[i] = 0.0
+
+        # Impose the accoustic sum rule
+        if asr and self.is_gamma:
+          eigval[0] = 0.0
+          eigval[1] = 0.0
+          eigval[2] = 0.0
+
+        # Frequencies
+        self.omega = np.sqrt(eigval)
         self.eigvect = eigvect
-        self.gprimd = gprimd
     
-        return omega, eigvect
+        return self.omega, self.eigvect
     
     def get_reduced_displ(self):
         """
@@ -191,8 +187,39 @@ class DdbFile(EpcFile):
     
         return displ_red_FAN2, displ_red_DDW2
 
+    def get_bose(self, temperatures):
+        """
+        Get the Bose-Einstein occupations on a range of temperatures.
+        Returns: bose(3*natom, Ntemperatures)
+        """
+        if not self.omega:
+            self.compute_dynmat()
 
-    # This function should not be used, but it is left here for legacy code.
+        bose = zeros((3*self.natom, len(temperatures)))
+
+        for imode, omega in enumerate(self.omega):
+            omega = omega.real
+            if omega < tol6:
+                continue
+
+            for tt, T in enumerate(temperatures):
+
+                if T < tol6:
+                    continue
+
+                x = omega / (kb_HaK * T)
+
+                if x > 50.:
+                    continue
+
+                bose[imode,tt] = 1. / (np.exp(x) - 1)
+
+        return bose
+
+
+    # This old function reads the DDB from the ascii file.
+    # It is left here for legacy.
+    #
     #def DDB_file_open(self, filefullpath):
     #  """Open the DDB file and read it."""
     #  if not (os.path.isfile(filefullpath)):

@@ -3,7 +3,7 @@ from __future__ import print_function
 import numpy as np
 from numpy import zeros, ones, einsum
 
-from .constants import tol6, tol8, Ha2eV, kb_HaK
+from .constants import tol6, tol8, tol12, Ha2eV, kb_HaK
 
 from .mathutil import delta_lorentzian
 from . import EigFile, Eigr2dFile, FanFile, DdbFile
@@ -17,14 +17,16 @@ __author__ = "Gabriel Antonius, Samuel Ponce"
 class QptAnalyzer(object):
 
     def __init__(self, DDB_fname=None, eigq_fname=None, eig0_fname=None,
-                 EIGR2D_fname=None, EIGR2D0_fname=None,
+                 EIGR2D_fname=None, EIGR2D0_fname=None, EIGI2D_fname=None,
                  FAN_fname=None, FAN0_fname=None,
-                 wtq=1.0, smearing=0.00367, self.omegase=None):
+                 wtq=1.0, smearing=0.00367, temperatures=None,
+                 omegase=None):
 
         # Files
         self.ddb = DdbFile(DDB_fname, read=False)
         self.eigq = EigFile(eigq_fname, read=False)
         self.eigr2d = Eigr2dFile(EIGR2D_fname, read=False)
+        self.eigi2d = Eigr2dFile(EIGI2D_fname, read=False)
         self.fan = FanFile(FAN_fname, read=False)
         self.eig0 = EigFile(eig0_fname, read=False)
         self.eigr2d0 = Eigr2dFile(EIGR2D0_fname, read=False)
@@ -33,11 +35,29 @@ class QptAnalyzer(object):
         self.wtq = wtq
         self.smearing = smearing
         self.omegase = omegase if omegase else list()
-        self.is_gamma = False
+        self.temperatures = temperatures if temperatures else list()
+
+    @property
+    def is_gamma(self):
+        return self.ddb.is_gamma
+
+    @property
+    def nomegase(self):
+        return len(self.omegase)
+
+    @property
+    def ntemp(self):
+        return len(self.temperatures)
 
     def read_nonzero_files(self):
         """Read all nc files that are not specifically related to q=0."""
-        for f in (self.ddb, self.eigq, self.eigr2d, self.fan):
+        for f in (self.ddb, self.eigq, self.eigr2d, self.eigi2d, self.fan):
+            if f.fname:
+                f.read_nc()
+
+    def read_zero_files(self):
+        """Read all nc files that are not specifically related to q=0."""
+        for f in (self.eig0, self.eigr2d0, self.fan0):
             if f.fname:
                 f.read_nc()
 
@@ -68,20 +88,20 @@ class QptAnalyzer(object):
 
     def get_zpr_static_active(self):
         """
-        Compute the q-point zpr contribution in a static scheme
-        with the transitions between active and sternheimer.
+        Compute the q-point zpr contribution in a static scheme,
+        with the transitions split between active and sternheimer.
         """
     
         nkpt = self.eigr2d.nkpt
         nband = self.eigr2d.nband
         natom = self.eigr2d.natom
       
-        self.zpr = zeros((3,nkpt,nband), dtype=complex)
+        self.zpr = zeros((3, nkpt, nband), dtype=complex)
       
-        fan_term = zeros((nkpt,nband), dtype=complex)
-        ddw_term = zeros((nkpt,nband), dtype=complex)
-        fan_active  = zeros((nkpt,nband), dtype=complex)
-        ddw_active  = zeros((nkpt,nband), dtype=complex)
+        fan_term = zeros((nkpt, nband), dtype=complex)
+        ddw_term = zeros((nkpt, nband), dtype=complex)
+        fan_active  = zeros((nkpt, nband), dtype=complex)
+        ddw_active  = zeros((nkpt, nband), dtype=complex)
       
         # Get reduced displacement (scaled with frequency)
         displ_red_FAN2, displ_red_DDW2 = self.ddb.get_reduced_displ()
@@ -144,7 +164,7 @@ class QptAnalyzer(object):
       
         return self.zpr
 
-    def get_zpr_dynamical_active(self):
+    def get_zpr_dynamical(self):
         """
         Compute the q-point zpr contribution in a static scheme
         with the transitions between active and sternheimer.
@@ -154,12 +174,12 @@ class QptAnalyzer(object):
         nband = self.eigr2d.nband
         natom = self.eigr2d.natom
       
-        self.zpr = zeros((3,nkpt,nband), dtype=complex)
+        self.zpr = zeros((3, nkpt, nband), dtype=complex)
       
-        fan_term = zeros((nkpt,nband), dtype=complex)
-        ddw_term = zeros((nkpt,nband), dtype=complex)
-        fan_active  = zeros((nkpt,nband), dtype=complex)
-        ddw_active  = zeros((nkpt,nband), dtype=complex)
+        fan_term = zeros((nkpt, nband), dtype=complex)
+        ddw_term = zeros((nkpt, nband), dtype=complex)
+        fan_active  = zeros((nkpt, nband), dtype=complex)
+        ddw_active  = zeros((nkpt, nband), dtype=complex)
       
         # Get reduced displacement (scaled with frequency)
         displ_red_FAN2, displ_red_DDW2 = self.ddb.get_reduced_displ()
@@ -326,7 +346,7 @@ class QptAnalyzer(object):
         else:
             occ = self.fan.occ[0,0,:]
     
-        self.zpb = zeros((nkpt, nband),dtype=complex)
+        self.zpb = zeros((nkpt, nband), dtype=complex)
       
         # Get reduced displacement (scaled with frequency)
         displ_red_FAN2, displ_red_DDW2 = self.ddb.get_reduced_displ()
@@ -365,6 +385,34 @@ class QptAnalyzer(object):
       
         return self.zpb
 
+    def get_zpb_static(self):
+        """
+        Compute the zp broadening contribution from one q-point in a static scheme
+        from the EIGI2D files.
+        """
+    
+        nkpt = self.eigi2d.nkpt
+        nband = self.eigi2d.nband
+        natom = self.eigi2d.natom
+    
+        total_corr = zeros((3, nkpt, nband),dtype=complex)
+    
+        # Get reduced displacement (scaled with frequency)
+        displ_red_FAN2, displ_red_DDW2 = self.ddb.get_reduced_displ()
+        
+        fan_corrQ = einsum('ijklmn,olnkm->oij', self.eigi2d.EIG2D, displ_red_FAN2)
+    
+        self.zpb = zeros((nkpt, nband), dtype=complex)
+        self.zpb += np.pi * np.sum(fan_corrQ, axis=0)
+        self.zpb = self.zpb * self.wtq
+    
+        if np.any(self.zpb[:,:].imag > tol12):
+          warnings.warn("The real part of the broadening is non zero: {}".format(broadening))
+    
+        self.zpb = self.eig0.make_average(self.zpb)
+    
+        return self.zpb
+
     def get_zp_self_energy(self):
         """
         Compute the zp frequency-dependent dynamical self-energy from one q-point.
@@ -380,9 +428,9 @@ class QptAnalyzer(object):
         nband = self.eigr2d.nband
         natom = self.eigr2d.natom
     
-        nomegase = len(omegase)
+        nomegase = self.nomegase
       
-        self.sigma = zeros((nkpt,nband,nomegase), dtype=complex)
+        self.sigma = zeros((nkpt, nband, nomegase), dtype=complex)
       
         # Get reduced displacement (scaled with frequency)
         displ_red_FAN2, displ_red_DDW2 = self.ddb.get_reduced_displ()
@@ -390,10 +438,10 @@ class QptAnalyzer(object):
         # nmode
         omega = self.ddb.omega[:].real
     
-        fan_term = zeros((nomegase,nkpt,nband), dtype=complex)
-        ddw_term = zeros((nkpt,nband), dtype=complex)
-        fan_add  = zeros((nomegase,nkpt,nband), dtype=complex)
-        ddw_add  = zeros((nkpt,nband), dtype=complex)
+        fan_term = zeros((nomegase, nkpt, nband), dtype=complex)
+        ddw_term = zeros((nkpt, nband), dtype=complex)
+        fan_add  = zeros((nomegase, nkpt,nband), dtype=complex)
+        ddw_add  = zeros((nkpt, nband), dtype=complex)
       
         # fan_corrQ and ddw_corrQ contains the ZPR on Sternheimer space.
         fan_corrQ = einsum('ijklmn,olnkm->oij', self.eigr2d.EIG2D, displ_red_FAN2)
@@ -401,8 +449,8 @@ class QptAnalyzer(object):
         ddw_corrQ = einsum('ijklmn,olnkm->oij', self.eigr2d0.EIG2D, displ_red_DDW2)
       
         # Sum Sternheimer (upper) contribution
-        fan_term = np.sum(fan_corrQ,axis=0)
-        ddw_term = np.sum(ddw_corrQ,axis=0)
+        fan_term = np.sum(fan_corrQ, axis=0)
+        ddw_term = np.sum(ddw_corrQ, axis=0)
       
         # Now compute active space
       
@@ -490,4 +538,239 @@ class QptAnalyzer(object):
       
         return self.sigma
 
+    def get_tdr_static(self):
+        """
+        Compute the q-point contribution to the temperature-dependent
+        renormalization in a static scheme.
+        """
+    
+        self.tdr = zeros((3, self.ntemp, self.eigr2d.nkpt, self.eigr2d.nband), dtype=complex)
+    
+        # Get reduced displacement (scaled with frequency)
+        displ_red_FAN2, displ_red_DDW2 = self.ddb.get_reduced_displ()
+    
+        bose = self.ddb.get_bose(self.temperatures)
+    
+        fan_term = zeros((self.ntemp, self.eigr2d.nkpt, self.eigr2d.nband), dtype=complex)
+        ddw_term = zeros((self.ntemp, self.eigr2d.nkpt, self.eigr2d.nband), dtype=complex)
+    
+        fan_corrQ = einsum('ijklmn,olnkm->oij', self.eigr2d.EIG2D, displ_red_FAN2)
+        ddw_corrQ = einsum('ijklmn,olnkm->oij', self.eigr2d0.EIG2D, displ_red_DDW2)
+    
+        fan_term = einsum('ijk,il->ljk', fan_corrQ, 2*bose+1.)
+        ddw_term = einsum('ijk,il->ljk', ddw_corrQ, 2*bose+1.)
+    
+        self.tdr[0,:,:,:] = (fan_term[:,:,:]- ddw_term[:,:,:]) * self.wtq
+        self.tdr[1,:,:,:] = fan_term[:,:,:] * self.wtq
+        self.tdr[2,:,:,:] = ddw_term[:,:,:] * self.wtq
+    
+        self.tdr = self.eig0.make_average(self.tdr)
+    
+        return self.tdr
+
+
+    def get_tdr_static_active(self):
+        """
+        Compute the q-point contribution to the temperature-dependent
+        renormalization in a static scheme,
+        with the transitions split between active and sternheimer.
+        """
+    
+        nkpt = self.eigr2d.nkpt
+        nband = self.eigr2d.nband
+        natom = self.eigr2d.natom
+        ntemp = self.ntemp
+    
+        self.tdr =  zeros((3, ntemp, nkpt, nband), dtype=complex)
+    
+        # Get reduced displacement (scaled with frequency)
+        displ_red_FAN2, displ_red_DDW2 = self.ddb.get_reduced_displ()
+    
+        bose = self.ddb.get_bose(self.temperatures)
+    
+        fan_term =  zeros((ntemp, nkpt, nband), dtype=complex)
+        ddw_term = zeros((ntemp, nkpt, nband), dtype=complex)
+        fan_add = zeros((ntemp, nkpt, nband),dtype=complex)
+        ddw_add = zeros((ntemp, nkpt, nband),dtype=complex)
+    
+        # Sternheimer part
+        fan_corrQ = einsum('ijklmn,olnkm->oij', self.eigr2d.EIG2D, displ_red_FAN2)
+        ddw_corrQ = einsum('ijklmn,olnkm->oij', self.eigr2d0.EIG2D, displ_red_DDW2)
+    
+        fan_term = einsum('ijk,il->ljk', fan_corrQ, 2*bose+1.0)
+        ddw_term = einsum('ijk,il->ljk', ddw_corrQ, 2*bose+1.0)
+    
+        # Now compute active space
+        fan_addQ = einsum('ijklmno,plnkm->ijop', self.fan.FAN, displ_red_FAN2)
+        ddw_addQ = einsum('ijklmno,plnkm->ijop', self.fan0.FAN, displ_red_DDW2)
+    
+    
+        # ikpt,iband,jband      
+        delta_E = (einsum('ij,k->ijk', self.eig0.EIG[0,:,:].real, ones(nband)) -
+                   einsum('ij,k->ikj', self.eigq.EIG[0,:,:].real, ones(nband)))
+    
+        delta_E_ddw = (einsum('ij,k->ijk', self.eig0.EIG[0,:,:].real, ones(nband)) -
+                       einsum('ij,k->ikj', self.eig0.EIG[0,:,:].real, ones(nband)))
+    
+        # imode,ntemp,ikpt,iband,jband
+        num = einsum('ij,klm->ijklm', 2*bose+1., delta_E)
+    
+        # ikpt,iband,jband
+        deno = delta_E ** 2 + smearing ** 2
+    
+        # imode,ntemp,ikpt,iband,jband 
+        div =  einsum('ijklm,klm->ijklm', num, 1. / deno)
+    
+        #(ikpt,iband,jband,imode),(imode,ntemp,ikpt,iband,jband)->ntemp,ikpt,iband
+        fan_add = einsum('ijkl,lmijk->mij', fan_addQ, div)
+    
+        # imode,ntemp,ikpt,iband,jband
+        num = einsum('ij,klm->ijklm', 2*bose+1., delta_E_ddw)
+    
+        # ikpt,iband,jband
+        deno = delta_E_ddw ** 2 + smearing ** 2
+    
+        div =  einsum('ijklm,klm->ijklm', num, 1. / deno)
+    
+        #(ikpt,iband,jband,imode),(imode,ntemp,ikpt,iband,jband)->ntemp,ikpt,iband 
+        ddw_add = einsum('ijkl,lmijk->mij', ddw_addQ, div)
+    
+    
+        fan_term += fan_add
+        ddw_term += ddw_add
+    
+        self.tdr[0,:,:,:] = (fan_term[:,:,:] - ddw_term[:,:,:]) * self.wtq
+        self.tdr[1,:,:,:] = fan_term[:,:,:] * self.wtq
+        self.tdr[2,:,:,:] = ddw_term[:,:,:] * self.wtq
+    
+        self.tdr = self.eig0.make_average(self.tdr)
+    
+        return self.tdr
+
+    def get_tdr_dynamical(self):
+        """
+        Compute the q-point contribution to the temperature-dependent
+        renormalization in a dynamical scheme.
+        """
+    
+        nkpt = self.eigr2d.nkpt
+        nband = self.eigr2d.nband
+        natom = self.eigr2d.natom
+        ntemp = self.ntemp
+    
+        self.tdr =  zeros((3, ntemp, nkpt, nband), dtype=complex)
+    
+        # Get reduced displacement (scaled with frequency)
+        displ_red_FAN2, displ_red_DDW2 = self.ddb.get_reduced_displ()
+    
+        bose = self.ddb.get_bose(self.temperatures)
+    
+        fan_term =  zeros((ntemp, nkpt, nband), dtype=complex)
+        ddw_term = zeros((ntemp, nkpt, nband), dtype=complex)
+        fan_add = zeros((ntemp, nkpt, nband),dtype=complex)
+        ddw_add = zeros((ntemp, nkpt, nband),dtype=complex)
+    
+        # Sternheimer part
+        fan_corrQ = einsum('ijklmn,olnkm->oij', self.eigr2d.EIG2D, displ_red_FAN2)
+        ddw_corrQ = einsum('ijklmn,olnkm->oij', self.eigr2d0.EIG2D, displ_red_DDW2)
+    
+        fan_term = einsum('ijk,il->ljk', fan_corrQ, 2*bose+1.0)
+        ddw_term = einsum('ijk,il->ljk', ddw_corrQ, 2*bose+1.0)
+    
+        # Now compute active space
+        fan_addQ = einsum('ijklmno,plnkm->ijop', self.fan.FAN, displ_red_FAN2)
+        ddw_addQ = einsum('ijklmno,plnkm->ijop', self.fan0.FAN, displ_red_DDW2)
+    
+    
+        # jband
+        if np.any(self.eigr2d.occ[0,0,:] == 2.0):
+            occ = self.eigr2d.occ[0,0,:] / 2
+        else:
+            occ = self.eigr2d.occ[0,0,:]
+    
+        delta_E_ddw = (einsum('ij,k->ijk', self.eig0.EIG[0,:,:].real, ones(nband)) -
+                       einsum('ij,k->ikj', self.eig0.EIG[0,:,:].real, ones(nband)) -
+                       einsum('ij,k->ijk', ones((nkpt, nband)), (2*occ-1)) * smearing * 1j)
+    
+        # ntemp,ikpt,iband,jband
+        tmp = einsum('ijkl,lm->mijk', ddw_addQ, 2*bose+1.0)
+        ddw_add = einsum('ijkl,jkl->ijk', tmp, 1.0 / delta_E_ddw)
+    
+        # ikpt,iband,jband
+        delta_E = (einsum('ij,k->ijk', self.eig0.EIG[0,:,:].real, ones(nband)) -
+                   einsum('ij,k->ikj', self.eigq.EIG[0,:,:].real, ones(nband)) -
+                   einsum('ij,k->ijk', ones((nkpt,nband)), (2*occ-1)) * smearing * 1j)
+    
+        omega = self.ddb.omega[:].real # imode
+    
+        # imode,ntemp,jband
+        num1 = (einsum('ij,k->ijk', bose, ones(nband)) + 1.0 -
+                einsum('ij,k->ijk', ones((3*natom, ntemp)), occ))
+    
+        # ikpt,iband,jband,imode
+        deno1 = (einsum('ijk,l->ijkl', delta_E,ones(3*natom)) -
+                 einsum('ijk,l->ijkl', ones((nkpt, nband, nband)), omega))
+    
+        # (imode,ntemp,jband)/(ikpt,iband,jband,imode) ==> imode,ntemp,jband,ikpt,iband
+        invdeno1 = np.real(deno1) / (np.real(deno1) ** 2 + np.imag(deno1) ** 2)
+        div1 = einsum('ijk,lmki->ijklm', num1, invdeno1)
+        #div1 = einsum('ijk,lmki->ijklm', num1, 1.0 / deno1)
+    
+        # imode,ntemp,jband
+        num2 = (einsum('ij,k->ijk', bose, ones(nband)) +
+                einsum('ij,k->ijk', ones((3*natom, ntemp)), occ))
+    
+        # ikpt,iband,jband,imode
+        deno2 = (einsum('ijk,l->ijkl', delta_E, ones(3*natom)) +
+                 einsum('ijk,l->ijkl', ones((nkpt, nband, nband)), omega)
+    
+        # (imode,ntemp,jband)/(ikpt,iband,jband,imode) ==> imode,ntemp,jband,ikpt,iband
+        invdeno2 = np.real(deno2) / (np.real(deno2) ** 2 + np.imag(deno2) ** 2)
+        div2 = einsum('ijk,lmki->ijklm', num2, invdeno2)
+        #div2 = einsum('ijk,lmki->ijklm', num2, 1.0 / deno2)
+    
+        # ikpt,iband,jband,imode
+        fan_add = einsum('ijkl,lmkij->mij', fan_addQ, div1 + div2)
+    
+
+        fan_term += fan_add
+        ddw_term += ddw_add
+    
+        self.tdr[0,:,:,:] = (fan_term[:,:,:] - ddw_term[:,:,:]) * self.wtq
+        self.tdr[1,:,:,:] = fan_term[:,:,:] * self.wtq
+        self.tdr[2,:,:,:] = ddw_term[:,:,:] * self.wtq
+    
+        self.tdr = self.eig0.make_average(self.tdr)
+    
+        return self.tdr
+
+    def get_tdb_static(self):
+        """
+        Compute the q-point contribution to the temperature-dependent broadening
+        in a static scheme from the EIGI2D files.
+        """
+    
+        nkpt = self.fan.nkpt
+        nband = self.fan.nband
+        natom = self.fan.natom
+        ntemp = self.ntemp
+          
+        self.tdb = zeros((ntemp, nkpt, nband), dtype=complex)
+    
+        # Get reduced displacement (scaled with frequency)
+        displ_red_FAN2, displ_red_DDW2 = self.ddb.get_reduced_displ()
+    
+        bose = self.ddb.get_bose(self.temperatures)
+    
+        fan_corrQ = einsum('ijklmn,olnkm->oij', self.eigi2d.EIG2D, displ_red_FAN2)
+    
+        for imode in np.arange(3*natom):
+          for tt, T in enumerate(self.temperatures):
+            self.tdb[tt,:,:] += np.pi * fan_corrQ[imode,:,:] * (2*bose[imode,tt] + 1.)
+    
+        self.tdb = self.tdb * self.wtq
+    
+        self.tdb = self.eig0.make_average(self.tdb)
+    
+        return self.tdb
 
