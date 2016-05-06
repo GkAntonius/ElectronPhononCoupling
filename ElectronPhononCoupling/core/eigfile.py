@@ -9,6 +9,8 @@ import netCDF4 as nc
 
 from . import EpcFile
 
+from .mpi import MPI, comm, size, rank, master, mpi_watch
+
 class EigFile(EpcFile):
 
     def __init__(self, *args, **kwargs):
@@ -21,8 +23,28 @@ class EigFile(EpcFile):
 
         with nc.Dataset(fname, 'r') as root:
 
-            self.EIG = root.variables['Eigenvalues'][:,:] 
+            self.EIG = root.variables['Eigenvalues'][:,:,:] 
             self.Kptns = root.variables['Kptns'][:,:]
+
+    @mpi_watch
+    def broadcast(self):
+        """Broadcast the data from master to all workers."""
+        comm.Barrier()
+
+        if rank == 0:
+            nspin, nkpt, nband = self.EIG.shape
+            dim = np.array([nspin, nkpt, nband], dtype=np.int)
+        else:
+            dim = np.empty(3, dtype=np.int)
+
+        comm.Bcast([dim, MPI.INT])
+
+        if rank != 0:
+            self.EIG = np.empty(dim, dtype=np.float64)
+            self.Kptns = np.empty((dim[1],3), dtype=np.float64)
+
+        comm.Bcast([self.EIG, MPI.DOUBLE])
+        comm.Bcast([self.Kptns, MPI.DOUBLE])
 
     def iter_spin_band_eig(self, ikpt):
         """

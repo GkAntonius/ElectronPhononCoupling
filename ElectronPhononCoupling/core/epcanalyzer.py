@@ -12,6 +12,8 @@ from .util import create_directory, formatted_array_lines
 
 from .qptanalyzer import QptAnalyzer
 
+from .mpi import comm, size, rank, master, mpi_abort_if_exception, mpi_watch
+
 # =========================================================================== #
 
 class EpcAnalyzer(object):
@@ -49,10 +51,11 @@ class EpcAnalyzer(object):
                  EIGR2D_fnames=list(),
                  EIGI2D_fnames=list(),
                  FAN_fnames=list(),
+                 output='epc.out',
                  temp_range=[0,0,1],
                  omega_range=[0,0,1],
                  smearing=0.00367,
-                 output='epc.out',
+                 asr=True,
                  **kwargs):
 
         # Check that the minimum number of files is present
@@ -87,19 +90,14 @@ class EpcAnalyzer(object):
             DDB_fname=self.DDB_fnames[0],
             EIGR2D0_fname=self.EIGR2D_fnames[0],
             FAN0_fname=self.FAN_fnames[0] if self.FAN_fnames else None,
+            asr=asr,
             )
 
         # Read the first DDB and check that it is Gamma
-        self.qptanalyzer.read_nonzero_files()
+        self.check_gamma()
 
-        if not self.qptanalyzer.is_gamma:
-            raise Exception('The first Q-point is not Gamma.')
-
-        # Read other files at q=0 
-        self.qptanalyzer.read_zero_files()
-
-        # Compute degeneracies
-        self.qptanalyzer.eig0.get_degen()
+        # Read other files at q=0 and broadcast the data
+        self.read_zero_files()
 
         # Get arrays dimensions
         self.nkpt = self.qptanalyzer.eigr2d0.nkpt
@@ -112,6 +110,22 @@ class EpcAnalyzer(object):
         self.set_smearing(smearing)
         self.set_output(output)
 
+    @master
+    def check_gamma(self):
+        self.qptanalyzer.read_nonzero_files()
+        if not self.qptanalyzer.is_gamma:
+            raise Exception('The first Q-point is not Gamma.')
+
+    @mpi_watch
+    def read_zero_files(self):
+        """Read the q=0 files and broadcast to all mpi workers."""
+
+        # Master reads the files
+        if rank == 0:
+            self.qptanalyzer.read_zero_files()
+
+        # Broadcast
+        self.qptanalyzer.broadcast_zero_files()
 
     def set_temp_range(self, temp_range=(0, 0, 1)):
         """Set the minimum, makimum and step temperature."""
@@ -155,6 +169,7 @@ class EpcAnalyzer(object):
 
         self.qptanalyzer.read_nonzero_files()
 
+    # TODO make the sum mpi-distributed.
     def sum_qpt_function(self, func_name, verbose=True, *args, **kwargs):
         """Call a certain function or each q-points and sum the result."""
 
@@ -290,6 +305,7 @@ class EpcAnalyzer(object):
                                 (omega - self.self_energy.real) ** 2 + self.self_energy.imag ** 2)
 
 
+    @master
     def write_netcdf(self):
         """Write all data to a netCDF file."""
         fname = str(self.output) + '_EP.nc'
@@ -395,6 +411,7 @@ class EpcAnalyzer(object):
         ncfile.close()
 
 
+    @master
     def write_renormalization(self):
         """Write the computed renormalization in a text file."""
         fname = str(self.output) + "_REN.txt"
@@ -418,6 +435,7 @@ class EpcAnalyzer(object):
                     O.write("{:>8.1f}  {:>12.8f}\n".format(T, ren))
 
 
+    @master
     def write_broadening(self):
         """Write the computed broadening in a text file."""
         fname = str(self.output) + "_BRD.txt"

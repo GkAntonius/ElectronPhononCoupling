@@ -1,3 +1,4 @@
+from . import mpi
 from . import constants
 from .util import *
 #from .rf_mods import *

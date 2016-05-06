@@ -5,6 +5,8 @@ from numpy import zeros, ones, einsum
 
 from .constants import tol6, tol8, tol12, Ha2eV, kb_HaK
 
+from .mpi import comm, size, rank, master
+
 from .mathutil import delta_lorentzian
 from . import EigFile, Eigr2dFile, FanFile, DdbFile
 
@@ -76,6 +78,20 @@ class QptAnalyzer(object):
         for f in (self.eig0, self.eigr2d0, self.fan0):
             if f.fname:
                 f.read_nc()
+
+    def broadcast_zero_files(self):
+        """Broadcast the data related to q=0 from master to all workers."""
+
+        if self.eig0.fname:
+            self.eig0.broadcast()
+            self.eig0.get_degen()
+
+        if self.eigr2d0.fname:
+            self.eigr2d0.broadcast()
+
+        if self.fan0.fname:
+            self.fan0.broadcast()
+
 
     def get_zpr_static(self):
         """Compute the q-point zpr contribution in a static scheme."""

@@ -16,9 +16,11 @@ ElectronPhononCoupling/core/degenerate.py
 ElectronPhononCoupling/core/dynmat.py
 ElectronPhononCoupling/core/eigfile.py
 ElectronPhononCoupling/core/eigr2dfile.py
+ElectronPhononCoupling/core/epcanalyzer.py
 ElectronPhononCoupling/core/epcfile.py
 ElectronPhononCoupling/core/fanfile.py
 ElectronPhononCoupling/core/mathutil.py
+ElectronPhononCoupling/core/qptanalyzer.py
 ElectronPhononCoupling/core/rf_mods.py
 ElectronPhononCoupling/core/tdep.py
 ElectronPhononCoupling/core/util.py
@@ -111,6 +113,7 @@ ElectronPhononCoupling/data/outputs_of_tests/t34_REN.txt
 ElectronPhononCoupling/data/outputs_of_tests/t41_EP.nc
 ElectronPhononCoupling/data/outputs_of_tests/t41_REN.txt
 ElectronPhononCoupling/interface/__init__.py
+ElectronPhononCoupling/interface/compute_epc.py
 ElectronPhononCoupling/interface/temperature_para.py
 ElectronPhononCoupling/interface/tests/__init__.py
 ElectronPhononCoupling/interface/tests/test_interface.py
