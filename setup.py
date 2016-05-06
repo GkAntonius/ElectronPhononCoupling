@@ -3,9 +3,7 @@
 import os
 from glob import glob
 
-
-from setuptools import find_packages #, setup
-from distutils.core import setup
+from setuptools import setup, find_packages
 
 #---------------------------------------------------------------------------
 # Basic project information
@@ -26,7 +24,6 @@ with open(release_file) as f:
 def find_scripts():
     """Find the scripts."""
     scripts = []
-    # All python files in abipy/scripts
     pyfiles = glob(os.path.join('ElectronPhononCoupling', 'scripts', "*"))
     scripts.extend(pyfiles)
     return scripts
@@ -35,13 +32,6 @@ def find_scripts():
 def get_long_desc():
     with open("README.rst") as fh:
         return fh.read()
-
-#def find_package_data():
-#    """Find data for tests and example."""
-#    package_data = {
-#        'ElectronPhononCoupling.data': ['*-data/*', 'inputs-for-tests/*'],
-#    }
-#    return package_data
 
 def write_manifest():
     content = """\

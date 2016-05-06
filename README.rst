@@ -27,7 +27,7 @@ Interactive usage:
 
     >$ electron-phonon-coupling
 
-or in parallel, e.g. :
+or in parallel, e.g.:
 
     >$ mpirun -n 4 electron-phonon-coupling
 
