@@ -7,6 +7,7 @@ comm = MPI.COMM_WORLD
 size = comm.Get_size()
 rank = comm.Get_rank()
 
+i_am_master = bool(rank == 0)
 
 @contextmanager
 def mpi_abort_if_exception():
@@ -28,7 +29,7 @@ def mpi_watch(f):
 def master(f):
     """Decorator. Let a function be executed only by master."""
     def g(*args, **kwargs):
-        if rank == 0:
+        if i_am_master:
             with mpi_abort_if_exception():
                 return f(*args, **kwargs)
         return

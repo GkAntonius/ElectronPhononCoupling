@@ -12,7 +12,7 @@ from .util import create_directory, formatted_array_lines
 
 from .qptanalyzer import QptAnalyzer
 
-from .mpi import comm, size, rank, master, mpi_abort_if_exception, mpi_watch
+from .mpi import comm, size, rank, master, mpi_abort_if_exception, mpi_watch, i_am_master
 
 # =========================================================================== #
 
@@ -41,6 +41,8 @@ class EpcAnalyzer(object):
 
     self_energy = None
     spectral_function = None
+
+    my_iqpts = [0]
 
     def __init__(self,
                  nqpt=1,
@@ -99,6 +101,9 @@ class EpcAnalyzer(object):
         # Read other files at q=0 and broadcast the data
         self.read_zero_files()
 
+        # Split the workload between workers
+        self.distribute_workload()
+
         # Get arrays dimensions
         self.nkpt = self.qptanalyzer.eigr2d0.nkpt
         self.nband = self.qptanalyzer.eigr2d0.nband
@@ -121,7 +126,7 @@ class EpcAnalyzer(object):
         """Read the q=0 files and broadcast to all mpi workers."""
 
         # Master reads the files
-        if rank == 0:
+        if i_am_master:
             self.qptanalyzer.read_zero_files()
 
         # Broadcast
@@ -169,20 +174,77 @@ class EpcAnalyzer(object):
 
         self.qptanalyzer.read_nonzero_files()
 
-    # TODO make the sum mpi-distributed.
+    @mpi_watch
+    def distribute_workload(self):
+        """Distribute the q-points indicies to be treated by each worker."""
+
+        max_nqpt_per_worker = self.nqpt // size + min(self.nqpt % size, 1)
+        n_active_workers = self.nqpt // max_nqpt_per_worker + min(self.nqpt % max_nqpt_per_worker, 1)
+
+        self.my_iqpts = list()
+
+        for i in range(max_nqpt_per_worker):
+
+            iqpt = rank * max_nqpt_per_worker + i
+
+            if iqpt >= self.nqpt:
+                break
+
+            self.my_iqpts.append(iqpt)
+
+    @property
+    def active_worker(self):
+        return bool(self.my_iqpts)
+
+    def get_active_ranks(self):
+        """Get the ranks of all active workers."""
+        max_nqpt_per_worker = self.nqpt // size + min(self.nqpt % size, 1)
+        n_active_workers = self.nqpt // max_nqpt_per_worker + min(self.nqpt % max_nqpt_per_worker, 1)
+        return np.arange(n_active_workers)
+
+    @mpi_watch
     def sum_qpt_function(self, func_name, verbose=True, *args, **kwargs):
         """Call a certain function or each q-points and sum the result."""
 
-        self.set_iqpt(0)
+        partial_sum = self.sum_qpt_function_me(func_name, verbose=verbose, *args, **kwargs)
+
+        if i_am_master:
+            total = partial_sum
+            active_ranks = self.get_active_ranks()
+            if len(active_ranks) > 1:
+                for irank in active_ranks[1:]:
+                    partial_sum = comm.recv(source=irank, tag=irank)
+                    total += partial_sum
+        elif self.active_worker:
+            comm.send(partial_sum, dest=0, tag=rank)
+            return
+        else:
+            return
+
+        # Now I could broadcast the total result to all workers
+        # but right now there is no need to.
+
+        return total
+
+    def sum_qpt_function_me(self, func_name, verbose=True, *args, **kwargs):
+        """Call a certain function or each q-points of this worker and sum the result."""
+        if not self.active_worker:
+            return None
+
+        iqpt = self.my_iqpts[0]
+        self.set_iqpt(iqpt)
 
         if verbose:
             print("Q-point: {} with wtq = {} and reduced coord. {}".format(
-                  0, self.qptanalyzer.wtq, self.qptanalyzer.qred))
+                  iqpt, self.qptanalyzer.wtq, self.qptanalyzer.qred))
 
         q0 = getattr(self.qptanalyzer, func_name)(*args, **kwargs)
         total = copy(q0)
 
-        for iqpt in range(1, self.nqpt):
+        if len(self.my_iqpts) == 1:
+            return total
+
+        for iqpt in self.my_iqpts[1:]:
 
             self.set_iqpt(iqpt)
 
@@ -288,6 +350,7 @@ class EpcAnalyzer(object):
         self.self_energy = self.sum_qpt_function('get_zp_self_energy')
 
 
+    @master
     def compute_spectral_function(self):
         """
         Compute the spectral function of all quasiparticles in the semi-static approximation,

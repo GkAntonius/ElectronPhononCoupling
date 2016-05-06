@@ -8,11 +8,19 @@ from ..core.constants import Ha2eV
 from ..config import __version__
 from ..core.util import report_runtime
 
+from ..core.mpi import comm, size, rank, master, mpi_abort_if_exception, mpi_watch, i_am_master
+
 # ============================================================================ #
 
 def run_interactive():
     """Run the calculation after getting inputs interactively from the user."""
-    arguments = get_user_input()
+    with mpi_abort_if_exception():
+        if i_am_master:
+            arguments = get_user_input()
+        else:
+            arguments = None
+        arguments = comm.bcast(arguments, root=0)
+
     epc = compute_epc(**arguments)
 
 

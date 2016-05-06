@@ -29,7 +29,7 @@ class Eigr2dFile(EpcFile):
             # number_of_spins, number_of_kpoints, max_number_of_states
             self.occ = root.variables['occupations'][:,:,:]
 
-            self.EIG2D = zeros((self.nkpt,self.nband,3,self.natom,3,self.natom), dtype=np.complex)
+            self.EIG2D = zeros((self.nkpt, self.nband, 3, self.natom, 3, self.natom), dtype=np.complex)
 
             # number_of_atoms, number_of_cartesian_directions, number_of_atoms, number_of_cartesian_directions,
             # number_of_kpoints, product_mband_nsppol, cplex
@@ -73,7 +73,7 @@ class Eigr2dFile(EpcFile):
             self.occ = np.empty((self.nsppol, self.nkpt, self.nband), dtype=np.float)
 
             self.EIG2D = np.empty((self.nkpt, self.nband, 3, self.natom,
-                                   3, self.natom, self.nband), dtype=np.complex)
+                                   3, self.natom), dtype=np.complex)
 
             self.eigenvalues = np.empty((self.nsppol, self.nkpt, self.nband), dtype=np.float)
 
