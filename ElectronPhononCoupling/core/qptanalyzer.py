@@ -16,11 +16,20 @@ __author__ = "Gabriel Antonius, Samuel Ponce"
 
 class QptAnalyzer(object):
 
-    def __init__(self, DDB_fname=None, eigq_fname=None, eig0_fname=None,
-                 EIGR2D_fname=None, EIGR2D0_fname=None, EIGI2D_fname=None,
-                 FAN_fname=None, FAN0_fname=None,
-                 wtq=1.0, smearing=0.00367, temperatures=None,
-                 omegase=None):
+    def __init__(self,
+                 DDB_fname=None,
+                 eigq_fname=None,
+                 eig0_fname=None,
+                 EIGR2D_fname=None,
+                 EIGR2D0_fname=None,
+                 EIGI2D_fname=None,
+                 FAN_fname=None,
+                 FAN0_fname=None,
+                 wtq=1.0,
+                 smearing=0.00367,
+                 temperatures=None,
+                 omegase=None,
+                                ):
 
         # Files
         self.ddb = DdbFile(DDB_fname, read=False)
@@ -65,7 +74,7 @@ class QptAnalyzer(object):
         """Compute the q-point zpr contribution in a static scheme."""
     
         # First index is to separate zpr, fan, ddw
-        self.zpr = zeros((3, self.eigr2d.nkpt, self.eigr2d.nband), dtype=complex)
+        self.zpr = zeros((self.eigr2d.nkpt, self.eigr2d.nband), dtype=complex)
     
         # Get reduced displacement (scaled with frequency)
         displ_red_FAN2, displ_red_DDW2 = self.ddb.get_reduced_displ()
@@ -78,9 +87,7 @@ class QptAnalyzer(object):
         fan_term = np.sum(fan_term, axis=0)
         ddw_term = np.sum(ddw_term, axis=0)
     
-        self.zpr[0,:,:] = (fan_term[:,:] - ddw_term[:,:]) * self.wtq
-        self.zpr[1,:,:] = fan_term[:,:] * self.wtq
-        self.zpr[2,:,:] = ddw_term[:,:] * self.wtq
+        self.zpr = (fan_term - ddw_term) * self.wtq
     
         self.zpr = self.eig0.make_average(self.zpr)
     
@@ -96,7 +103,7 @@ class QptAnalyzer(object):
         nband = self.eigr2d.nband
         natom = self.eigr2d.natom
       
-        self.zpr = zeros((3, nkpt, nband), dtype=complex)
+        self.zpr = zeros((nkpt, nband), dtype=complex)
       
         fan_term = zeros((nkpt, nband), dtype=complex)
         ddw_term = zeros((nkpt, nband), dtype=complex)
@@ -156,9 +163,7 @@ class QptAnalyzer(object):
         fan_term += fan_active
         ddw_term += ddw_active
     
-        self.zpr[0,:,:] = (fan_term[:,:] - ddw_term[:,:]) * self.wtq
-        self.zpr[1,:,:] = fan_term[:,:] * self.wtq
-        self.zpr[2,:,:] = ddw_term[:,:] * self.wtq
+        self.zpr = (fan_term - ddw_term) * self.wtq
     
         self.zpr = self.eig0.make_average(self.zpr)
       
@@ -167,14 +172,14 @@ class QptAnalyzer(object):
     def get_zpr_dynamical(self):
         """
         Compute the q-point zpr contribution in a static scheme
-        with the transitions between active and sternheimer.
+        with the transitions split between active and sternheimer.
         """
     
         nkpt = self.eigr2d.nkpt
         nband = self.eigr2d.nband
         natom = self.eigr2d.natom
       
-        self.zpr = zeros((3, nkpt, nband), dtype=complex)
+        self.zpr = zeros((nkpt, nband), dtype=complex)
       
         fan_term = zeros((nkpt, nband), dtype=complex)
         ddw_term = zeros((nkpt, nband), dtype=complex)
@@ -255,9 +260,7 @@ class QptAnalyzer(object):
         fan_term += fan_active
         ddw_term += ddw_active
     
-        self.zpr[0,:,:] = (fan_term[:,:] - ddw_term[:,:]) * self.wtq
-        self.zpr[1,:,:] = fan_term[:,:] * self.wtq
-        self.zpr[2,:,:] = ddw_term[:,:] * self.wtq
+        self.zpr = (fan_term - ddw_term) * self.wtq
     
         self.zpr = self.eig0.make_average(self.zpr)
       
@@ -325,7 +328,7 @@ class QptAnalyzer(object):
         fan_add = einsum('ijkl,lkij->ij', fan_addQ, deltas)
 
         # Correction from active space 
-        self.zpb = fan_add[:,:] * self.wtq
+        self.zpb = fan_add * self.wtq
         self.zpb = self.eig0.make_average(self.zpb)
       
         return self.zpb
@@ -380,7 +383,7 @@ class QptAnalyzer(object):
         fan_add = einsum('ijkl,kij->ij', fan_addQ, deltasign)
       
         # Correction from active space 
-        self.zpb = fan_add[:,:] * self.wtq
+        self.zpb = fan_add * self.wtq
         self.zpb = self.eig0.make_average(self.zpb)
       
         return self.zpb
@@ -395,14 +398,13 @@ class QptAnalyzer(object):
         nband = self.eigi2d.nband
         natom = self.eigi2d.natom
     
-        total_corr = zeros((3, nkpt, nband),dtype=complex)
+        self.zpb = zeros((nkpt, nband), dtype=complex)
     
         # Get reduced displacement (scaled with frequency)
         displ_red_FAN2, displ_red_DDW2 = self.ddb.get_reduced_displ()
         
         fan_corrQ = einsum('ijklmn,olnkm->oij', self.eigi2d.EIG2D, displ_red_FAN2)
     
-        self.zpb = zeros((nkpt, nband), dtype=complex)
         self.zpb += np.pi * np.sum(fan_corrQ, axis=0)
         self.zpb = self.zpb * self.wtq
     
@@ -531,7 +533,7 @@ class QptAnalyzer(object):
         ddw_term += ddw_add
         ddw_term = einsum('ij,m->mij', ddw_term, ones(nomegase))
     
-        self.sigma = (fan_term[:,:,:] - ddw_term[:,:,:]) * self.wtq
+        self.sigma = (fan_term - ddw_term) * self.wtq
     
         self.sigma = self.eig0.make_average(qpt_sigma)
         self.sigma = einsum('mij->ijm', qpt_sigma)
@@ -544,7 +546,8 @@ class QptAnalyzer(object):
         renormalization in a static scheme.
         """
     
-        self.tdr = zeros((3, self.ntemp, self.eigr2d.nkpt, self.eigr2d.nband), dtype=complex)
+        # These indicies be swapped at the end
+        self.tdr = zeros((self.ntemp, self.eigr2d.nkpt, self.eigr2d.nband), dtype=complex)
     
         # Get reduced displacement (scaled with frequency)
         displ_red_FAN2, displ_red_DDW2 = self.ddb.get_reduced_displ()
@@ -560,11 +563,12 @@ class QptAnalyzer(object):
         fan_term = einsum('ijk,il->ljk', fan_corrQ, 2*bose+1.)
         ddw_term = einsum('ijk,il->ljk', ddw_corrQ, 2*bose+1.)
     
-        self.tdr[0,:,:,:] = (fan_term[:,:,:]- ddw_term[:,:,:]) * self.wtq
-        self.tdr[1,:,:,:] = fan_term[:,:,:] * self.wtq
-        self.tdr[2,:,:,:] = ddw_term[:,:,:] * self.wtq
+        self.tdr = (fan_term - ddw_term) * self.wtq
     
         self.tdr = self.eig0.make_average(self.tdr)
+
+        # nkpt, nband, ntemp
+        self.tdr = np.einsum('kij->ijk', self.tdr)
     
         return self.tdr
 
@@ -581,7 +585,8 @@ class QptAnalyzer(object):
         natom = self.eigr2d.natom
         ntemp = self.ntemp
     
-        self.tdr =  zeros((3, ntemp, nkpt, nband), dtype=complex)
+        # These indicies be swapped at the end
+        self.tdr =  zeros((ntemp, nkpt, nband), dtype=complex)
     
         # Get reduced displacement (scaled with frequency)
         displ_red_FAN2, displ_red_DDW2 = self.ddb.get_reduced_displ()
@@ -639,11 +644,12 @@ class QptAnalyzer(object):
         fan_term += fan_add
         ddw_term += ddw_add
     
-        self.tdr[0,:,:,:] = (fan_term[:,:,:] - ddw_term[:,:,:]) * self.wtq
-        self.tdr[1,:,:,:] = fan_term[:,:,:] * self.wtq
-        self.tdr[2,:,:,:] = ddw_term[:,:,:] * self.wtq
+        self.tdr = (fan_term - ddw_term) * self.wtq
     
         self.tdr = self.eig0.make_average(self.tdr)
+    
+        # nkpt, nband, ntemp
+        self.tdr = np.einsum('kij->ijk', self.tdr)
     
         return self.tdr
 
@@ -658,7 +664,7 @@ class QptAnalyzer(object):
         natom = self.eigr2d.natom
         ntemp = self.ntemp
     
-        self.tdr =  zeros((3, ntemp, nkpt, nband), dtype=complex)
+        self.tdr =  zeros((ntemp, nkpt, nband), dtype=complex)
     
         # Get reduced displacement (scaled with frequency)
         displ_red_FAN2, displ_red_DDW2 = self.ddb.get_reduced_displ()
@@ -736,11 +742,12 @@ class QptAnalyzer(object):
         fan_term += fan_add
         ddw_term += ddw_add
     
-        self.tdr[0,:,:,:] = (fan_term[:,:,:] - ddw_term[:,:,:]) * self.wtq
-        self.tdr[1,:,:,:] = fan_term[:,:,:] * self.wtq
-        self.tdr[2,:,:,:] = ddw_term[:,:,:] * self.wtq
+        self.tdr = (fan_term - ddw_term) * self.wtq
     
         self.tdr = self.eig0.make_average(self.tdr)
+    
+        # nkpt, nband, ntemp
+        self.tdr = np.einsum('kij->ijk', self.tdr)
     
         return self.tdr
 
@@ -755,6 +762,7 @@ class QptAnalyzer(object):
         natom = self.fan.natom
         ntemp = self.ntemp
           
+        # These indicies be swapped at the end
         self.tdb = zeros((ntemp, nkpt, nband), dtype=complex)
     
         # Get reduced displacement (scaled with frequency)
@@ -772,5 +780,8 @@ class QptAnalyzer(object):
     
         self.tdb = self.eig0.make_average(self.tdb)
     
+        # nkpt, nband, ntemp
+        self.tdb = np.einsum('kij->ijk', self.tdb)
+
         return self.tdb
 

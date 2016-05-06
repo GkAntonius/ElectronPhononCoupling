@@ -14,3 +14,4 @@ from .mathutil import *
 from .tdep import *
 from .zpm import *
 from .analyzer import *
+from .qptanalyzer import *
