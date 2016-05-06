@@ -1,10 +1,12 @@
 from __future__ import print_function
 
 import warnings
-import copy
+from copy import copy
 
 import numpy as np
 import netCDF4 as nc
+
+from .constants import Ha2eV
 
 from .util import create_directory, formatted_array_lines
 
@@ -80,14 +82,11 @@ class EpcAnalyzer(object):
 
         # Initialize a single QptAnalyzer
         self.qptanalyzer = QptAnalyzer(
+            wtq=self.wtq[0],
             eig0_fname=self.eig0_fname,
             DDB_fname=self.DDB_fnames[0],
             EIGR2D0_fname=self.EIGR2D_fnames[0],
             FAN0_fname=self.FAN_fnames[0] if self.FAN_fnames else None,
-            wtq=self.wtq[0],
-            smearing=self.smearing,
-            temperatures=self.temperatures,
-            omegase=self.omegase,
             )
 
         # Read the first DDB and check that it is Gamma
@@ -113,6 +112,27 @@ class EpcAnalyzer(object):
         self.set_smearing(smearing)
         self.set_output(output)
 
+
+    def set_temp_range(self, temp_range=(0, 0, 1)):
+        """Set the minimum, makimum and step temperature."""
+        self.temperatures = np.arange(*temp_range, dtype=float)
+        self.qptanalyzer.temperatures = self.temperatures
+
+    def set_omega_range(self, omega_range=(0, 0, 1)):
+        """Set the minimum, makimum and step frequency for the self-energy."""
+        self.omegase = np.arange(*omega_range, dtype=float)
+        self.nomegase = len(self.omegase)
+        self.qptanalyzer.omegase = self.omegase
+
+    def set_smearing(self, smearing_Ha):
+        """Set the smearing, in Hartree."""
+        self.smearing = smearing_Ha
+        self.qptanalyzer.smearing = smearing_Ha
+    
+    def set_output(self, root):
+        """Set the root for output names."""
+        self.output = root
+
     def set_iqpt(self, iqpt):
         """
         Give the qptanalyzer the weight and files corresponding
@@ -135,36 +155,27 @@ class EpcAnalyzer(object):
 
         self.qptanalyzer.read_nonzero_files()
 
-
-    def set_temp_range(self, temp_range=(0, 0, 1)):
-        """Set the minimum, makimum and step temperature."""
-        self.temperatures = np.arange(*temp_range, dtype=float)
-        self.qptanalyzer.temperatures = self.temperatures
-
-    def set_omega_range(self, omega_range=(0, 0, 1)):
-        """Set the minimum, makimum and step frequency for the self-energy."""
-        self.omegase = np.arange(*omega_range, dtype=float)
-        self.nomegase = len(self.omegase)
-        self.qptanalyzer.omegase = self.omegase
-
-    def set_smearing(self, smearing_Ha):
-        """Set the smearing, in Hartree."""
-        self.smearing = smearing_Ha
-        self.qptanalyzer.smearing = smearing
-    
-    def set_output(self, root):
-        """Set the root for output names."""
-        self.output = root
-
-    def sum_qpt_function(self, func_name, *args, **kwargs):
+    def sum_qpt_function(self, func_name, verbose=True, *args, **kwargs):
         """Call a certain function or each q-points and sum the result."""
 
         self.set_iqpt(0)
+
+        if verbose:
+            print("Q-point: {} with wtq = {} and reduced coord. {}".format(
+                  0, self.qptanalyzer.wtq, self.qptanalyzer.qred))
+
         q0 = getattr(self.qptanalyzer, func_name)(*args, **kwargs)
         total = copy(q0)
 
         for iqpt in range(1, self.nqpt):
+
             self.set_iqpt(iqpt)
+
+            if verbose:
+                print("Q-point: {} with wtq = {} and reduced coord. {}".format(
+                      iqpt, self.qptanalyzer.wtq, self.qptanalyzer.qred))
+
+
             qpt = getattr(self.qptanalyzer, func_name)(*args, **kwargs)
             total += qpt
 

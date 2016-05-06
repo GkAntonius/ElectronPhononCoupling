@@ -10,7 +10,7 @@ import numpy as np
 from numpy import zeros
 import netCDF4 as nc
 
-from .constants import tol6, me_amu
+from .constants import tol6, me_amu, kb_HaK
 from . import EpcFile
 
 class DdbFile(EpcFile):
@@ -18,7 +18,12 @@ class DdbFile(EpcFile):
     _rprim = np.identity(3)
     gprimd = np.identity(3)
     omega = None
+    asr = True
     
+    def __init__(self, *args, **kwargs):
+        self.asr = kwargs.pop('asr', True)
+        super(DdbFile, self).__init__(*args, **kwargs)
+
     def read_nc(self, fname=None):
         """Open the DDB.nc file and read it."""
         fname = fname if fname else self.fname
@@ -55,7 +60,7 @@ class DdbFile(EpcFile):
         self._rprim = np.array(value)
         self.gprimd = np.linalg.inv(np.matrix(self._rprim))
 
-    def compute_dynmat(self, asr=True):
+    def compute_dynmat(self, asr=None):
         """
         Diagonalize the dynamical matrix.
     
@@ -63,6 +68,7 @@ class DdbFile(EpcFile):
           omega: the frequencies, in Ha
           eigvect: the eigenvectors, in reduced coord
         """
+        asr = asr if asr is not None else self.asr
     
         # Retrive the amu for each atom
         amu = zeros(self.natom)
@@ -192,7 +198,7 @@ class DdbFile(EpcFile):
         Get the Bose-Einstein occupations on a range of temperatures.
         Returns: bose(3*natom, Ntemperatures)
         """
-        if not self.omega:
+        if self.omega is None:
             self.compute_dynmat()
 
         bose = zeros((3*self.natom, len(temperatures)))

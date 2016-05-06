@@ -29,10 +29,11 @@ class QptAnalyzer(object):
                  smearing=0.00367,
                  temperatures=None,
                  omegase=None,
+                 asr=True,
                                 ):
 
         # Files
-        self.ddb = DdbFile(DDB_fname, read=False)
+        self.ddb = DdbFile(DDB_fname, read=False, asr=asr)
         self.eigq = EigFile(eigq_fname, read=False)
         self.eigr2d = Eigr2dFile(EIGR2D_fname, read=False)
         self.eigi2d = Eigr2dFile(EIGI2D_fname, read=False)
@@ -51,6 +52,10 @@ class QptAnalyzer(object):
         return self.ddb.is_gamma
 
     @property
+    def qred(self):
+        return self.ddb.qred
+
+    @property
     def nomegase(self):
         return len(self.omegase)
 
@@ -63,6 +68,8 @@ class QptAnalyzer(object):
         for f in (self.ddb, self.eigq, self.eigr2d, self.eigi2d, self.fan):
             if f.fname:
                 f.read_nc()
+
+        self.ddb.compute_dynmat()
 
     def read_zero_files(self):
         """Read all nc files that are not specifically related to q=0."""
@@ -220,13 +227,13 @@ class QptAnalyzer(object):
             occ = self.eigr2d.occ[0,0,:]
     
         # nkpt, nband, nband
-        delta_E = (einsum('ij,k->ijk', eig0[0,:,:].real, ones(nband))
-                 - einsum('ij,k->ikj', eigq.EIG[0,:,:].real, ones(nband))
+        delta_E = (einsum('ij,k->ijk', self.eig0.EIG[0,:,:].real, ones(nband))
+                 - einsum('ij,k->ikj', self.eigq.EIG[0,:,:].real, ones(nband))
                  - einsum('ij,k->ijk', ones((nkpt,nband)), (2*occ-1)) * self.smearing * 1j)
     
         # nkpt, nband, nband
-        delta_E_ddw = (einsum('ij,k->ijk', eig0[0,:,:].real, ones(nband))
-                     - einsum('ij,k->ikj', eig0[0,:,:].real, ones(nband))
+        delta_E_ddw = (einsum('ij,k->ijk', self.eig0.EIG[0,:,:].real, ones(nband))
+                     - einsum('ij,k->ikj', self.eig0.EIG[0,:,:].real, ones(nband))
                      - einsum('ij,k->ijk', ones((nkpt,nband)), (2*occ-1)) * self.smearing * 1j)
     
         # nkpt, nband
@@ -374,7 +381,7 @@ class QptAnalyzer(object):
         num = - (2 * occ - 1.)
     
         # nkpt, nband, nband, nmode
-        delta =  np.pi * delta_lorentzian(delta_E, smearing)
+        delta =  np.pi * delta_lorentzian(delta_E, self.smearing)
     
         # nband, nkpt, nband
         deltasign = einsum('i,jki->ijk', num, delta)
@@ -478,7 +485,7 @@ class QptAnalyzer(object):
         # nkpt, nband, nband
         delta_E_ddw = (einsum('ij,k->ijk', eig0[0,:,:].real, ones(nband))
                      - einsum('ij,k->ikj', eig0[0,:,:].real, ones(nband))
-                     - einsum('ij,k->ijk', ones((nkpt,nband)), (2*occ-1)) * smearing * 1j)
+                     - einsum('ij,k->ijk', ones((nkpt,nband)), (2*occ-1)) * self.smearing * 1j)
     
         # nkpt, nband
         ddw_add = einsum('ijk,ijk->ij', ddw_tmp, 1.0 / delta_E_ddw)
@@ -495,7 +502,7 @@ class QptAnalyzer(object):
             # delta_E[ikpt,jband] = E[ikpt,jband] - E[ikpt,kband] - (2f[kband] -1) * eta * 1j
             delta_E = (self.eig0.EIG[0,:,:].real
                      - einsum('i,j->ij', self.eigq.EIG[0,:,kband].real, ones(nband))
-                     - ones((nkpt,nband)) * (2*occ[kband]-1) * smearing * 1j)
+                     - ones((nkpt,nband)) * (2*occ[kband]-1) * self.smearing * 1j)
     
             # nkpt, nband, nomegase
             # delta_E_omega[ikpt,jband,lomega] = omega[lomega] + E[ikpt,jband] - E[ikpt,kband] - (2f[kband] -1) * eta * 1j
@@ -586,7 +593,7 @@ class QptAnalyzer(object):
         ntemp = self.ntemp
     
         # These indicies be swapped at the end
-        self.tdr =  zeros((ntemp, nkpt, nband), dtype=complex)
+        self.tdr = zeros((ntemp, nkpt, nband), dtype=complex)
     
         # Get reduced displacement (scaled with frequency)
         displ_red_FAN2, displ_red_DDW2 = self.ddb.get_reduced_displ()
@@ -621,7 +628,7 @@ class QptAnalyzer(object):
         num = einsum('ij,klm->ijklm', 2*bose+1., delta_E)
     
         # ikpt,iband,jband
-        deno = delta_E ** 2 + smearing ** 2
+        deno = delta_E ** 2 + self.smearing ** 2
     
         # imode,ntemp,ikpt,iband,jband 
         div =  einsum('ijklm,klm->ijklm', num, 1. / deno)
@@ -633,7 +640,7 @@ class QptAnalyzer(object):
         num = einsum('ij,klm->ijklm', 2*bose+1., delta_E_ddw)
     
         # ikpt,iband,jband
-        deno = delta_E_ddw ** 2 + smearing ** 2
+        deno = delta_E_ddw ** 2 + self.smearing ** 2
     
         div =  einsum('ijklm,klm->ijklm', num, 1. / deno)
     
@@ -696,7 +703,7 @@ class QptAnalyzer(object):
     
         delta_E_ddw = (einsum('ij,k->ijk', self.eig0.EIG[0,:,:].real, ones(nband)) -
                        einsum('ij,k->ikj', self.eig0.EIG[0,:,:].real, ones(nband)) -
-                       einsum('ij,k->ijk', ones((nkpt, nband)), (2*occ-1)) * smearing * 1j)
+                       einsum('ij,k->ijk', ones((nkpt, nband)), (2*occ-1)) * self.smearing * 1j)
     
         # ntemp,ikpt,iband,jband
         tmp = einsum('ijkl,lm->mijk', ddw_addQ, 2*bose+1.0)
@@ -705,7 +712,7 @@ class QptAnalyzer(object):
         # ikpt,iband,jband
         delta_E = (einsum('ij,k->ijk', self.eig0.EIG[0,:,:].real, ones(nband)) -
                    einsum('ij,k->ikj', self.eigq.EIG[0,:,:].real, ones(nband)) -
-                   einsum('ij,k->ijk', ones((nkpt,nband)), (2*occ-1)) * smearing * 1j)
+                   einsum('ij,k->ijk', ones((nkpt,nband)), (2*occ-1)) * self.smearing * 1j)
     
         omega = self.ddb.omega[:].real # imode
     
@@ -728,7 +735,7 @@ class QptAnalyzer(object):
     
         # ikpt,iband,jband,imode
         deno2 = (einsum('ijk,l->ijkl', delta_E, ones(3*natom)) +
-                 einsum('ijk,l->ijkl', ones((nkpt, nband, nband)), omega)
+                 einsum('ijk,l->ijkl', ones((nkpt, nband, nband)), omega))
     
         # (imode,ntemp,jband)/(ikpt,iband,jband,imode) ==> imode,ntemp,jband,ikpt,iband
         invdeno2 = np.real(deno2) / (np.real(deno2) ** 2 + np.imag(deno2) ** 2)
