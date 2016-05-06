@@ -80,7 +80,7 @@ class EpcAnalyzer(object):
 
         # Set basic quantities
         self.nqpt = nqpt
-        self.wtq = wtq
+        self.wtq = np.array(wtq) / sum(wtq)
 
         # Set file names
         self.eig0_fname = eig0_fname
