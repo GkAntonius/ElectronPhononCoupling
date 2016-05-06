@@ -64,6 +64,7 @@ epc = compute_epc(
         lifetime=False,
         nqpt=nqpt,
         wtq=wtq,
+        verbose=False,
         **fnames)
 
 

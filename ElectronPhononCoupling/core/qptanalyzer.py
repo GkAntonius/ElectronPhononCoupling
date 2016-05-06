@@ -10,8 +10,7 @@ from . import EigFile, Eigr2dFile, FanFile, DdbFile
 
 __author__ = "Gabriel Antonius, Samuel Ponce"
 
-
-# =========================================================================== #
+__all__ = ['QptAnalyzer']
 
 
 class QptAnalyzer(object):

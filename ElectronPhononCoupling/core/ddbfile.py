@@ -13,6 +13,9 @@ import netCDF4 as nc
 from .constants import tol6, me_amu, kb_HaK
 from . import EpcFile
 
+__all__ = ['DdbFile']
+
+
 class DdbFile(EpcFile):
 
     _rprim = np.identity(3)

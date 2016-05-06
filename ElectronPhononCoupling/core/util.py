@@ -3,23 +3,25 @@ from datetime import datetime
 
 from .mpi import comm, mpi_abort_if_exception, i_am_master
 
-# TODO make mpi
 def report_runtime(f):
     """Decorator to print runtime of a function."""
     def g(*args, **kwargs):
+        verbose = kwargs.get('verbose', False)
         if i_am_master:
             with mpi_abort_if_exception():
                 start = datetime.now()
-                print('Start on {}'.format(str(start).split('.')[0]))
+                if verbose:
+                    print('Start on {}'.format(str(start).split('.')[0]))
         comm.Barrier()
         out = f(*args, **kwargs)
         comm.Barrier()
         if i_am_master:
             with mpi_abort_if_exception():
                 end = datetime.now()
-                print('End on {}'.format(str(end).split('.')[0]))
                 runtime = end - start
-                print("Runtime: {} seconds ({:.1f} minutes)".format(runtime.seconds, runtime.seconds / 60.))
+                if verbose:
+                    print('End on {}'.format(str(end).split('.')[0]))
+                    print("Runtime: {} seconds ({:.1f} minutes)".format(runtime.seconds, runtime.seconds / 60.))
         return out
     g.__doc__ = f.__doc__
     return g

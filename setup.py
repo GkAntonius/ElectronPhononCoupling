@@ -61,6 +61,11 @@ prune ElectronPhononCoupling/data/inputs-for-tests/output
 
 write_manifest()
 
+install_requires = [
+    'numpy >=1.8',
+    'mpi4py >=2.0',
+    ]
+
 my_package_data = {
         'ElectronPhononCoupling.data' : ['data_*/*', 'inputs_for_tests/*.*', 'outputs_of_tests/*'],
     }
@@ -82,6 +87,7 @@ setup_args = dict(
       scripts          = find_scripts(),
       package_data     = my_package_data,
       exclude_package_data = my_exclude_package_data,
+      install_requires = install_requires,
       )
 
 if __name__ == "__main__":

@@ -1,14 +1,10 @@
+"""Generic functions"""
 
-import numpy as N
+import numpy as np
 from numpy import zeros
 
-from .constants import tol6, tol8, Ha2eV, kb_HaK
-
-# =========================================================================== #
-# Generic functions
-
-@N.vectorize
+@np.vectorize
 def delta_lorentzian(x, eta):
     """The lorentzian representation of a delta function."""
-    return (eta / N.pi) / (x ** 2 + eta ** 2)
+    return (eta / np.pi) / (x ** 2 + eta ** 2)
 

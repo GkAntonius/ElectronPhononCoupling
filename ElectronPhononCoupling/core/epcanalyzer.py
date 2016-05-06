@@ -16,6 +16,9 @@ from .mpi import comm, size, rank, master_only, mpi_abort_if_exception, mpi_watc
 
 # =========================================================================== #
 
+__all__ = ['EpcAnalyzer']
+
+
 class EpcAnalyzer(object):
     """
     Main class for analysing electron-phonon coupling related quantities.
@@ -25,6 +28,7 @@ class EpcAnalyzer(object):
     the first q-point being Gamma.
 
     """
+    verbose = False
     wtq = None
     broadening = None
     temperatures = []
@@ -58,6 +62,7 @@ class EpcAnalyzer(object):
                  omega_range=[0,0,1],
                  smearing=0.00367,
                  asr=True,
+                 verbose=False,
                  **kwargs):
 
         # Check that the minimum number of files is present
@@ -114,6 +119,8 @@ class EpcAnalyzer(object):
         self.set_omega_range(omega_range)
         self.set_smearing(smearing)
         self.set_output(output)
+
+        self.verbose = verbose
 
     @master_only
     def check_gamma(self):
@@ -203,10 +210,10 @@ class EpcAnalyzer(object):
         return np.arange(n_active_workers)
 
     @mpi_watch
-    def sum_qpt_function(self, func_name, verbose=True, *args, **kwargs):
+    def sum_qpt_function(self, func_name, *args, **kwargs):
         """Call a certain function or each q-points and sum the result."""
 
-        partial_sum = self.sum_qpt_function_me(func_name, verbose=verbose, *args, **kwargs)
+        partial_sum = self.sum_qpt_function_me(func_name, *args, **kwargs)
 
         if i_am_master:
             total = partial_sum
@@ -226,7 +233,7 @@ class EpcAnalyzer(object):
 
         return total
 
-    def sum_qpt_function_me(self, func_name, verbose=True, *args, **kwargs):
+    def sum_qpt_function_me(self, func_name, *args, **kwargs):
         """Call a certain function or each q-points of this worker and sum the result."""
         if not self.active_worker:
             return None
@@ -234,7 +241,7 @@ class EpcAnalyzer(object):
         iqpt = self.my_iqpts[0]
         self.set_iqpt(iqpt)
 
-        if verbose:
+        if self.verbose:
             print("Q-point: {} with wtq = {} and reduced coord. {}".format(
                   iqpt, self.qptanalyzer.wtq, self.qptanalyzer.qred))
 
@@ -248,7 +255,7 @@ class EpcAnalyzer(object):
 
             self.set_iqpt(iqpt)
 
-            if verbose:
+            if self.verbose:
                 print("Q-point: {} with wtq = {} and reduced coord. {}".format(
                       iqpt, self.qptanalyzer.wtq, self.qptanalyzer.qred))
 

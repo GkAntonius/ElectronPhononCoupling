@@ -21,7 +21,7 @@ class TestCommandLine(unittest.TestCase):
 
     def run_pp_temperature_with_input(self, fname):
         os.chdir(inputsdir)
-        os.system('pp-temperature < ' + fname)
+        os.system('electron-phonon-coupling < ' + fname)
 
     #def test_test11(self): self.run_pp_temperature_with_input('t11.in')
     #def test_test12(self): self.run_pp_temperature_with_input('t12.in')

@@ -13,6 +13,9 @@ from .mpi import MPI, comm, size, rank, mpi_watch
 
 from . import EpcFile
 
+__all__ = ['FanFile']
+
+
 class FanFile(EpcFile):
     
     def read_nc(self, fname=None):

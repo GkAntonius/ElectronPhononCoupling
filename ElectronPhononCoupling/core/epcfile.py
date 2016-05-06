@@ -3,8 +3,8 @@ from __future__ import print_function
 
 __author__ = "Gabriel Antonius"
 
-
 __all__ = ['EpcFile']
+
 
 class EpcFile(object):
     """Base class for netCDF files used by EPC."""

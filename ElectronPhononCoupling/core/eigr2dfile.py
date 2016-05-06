@@ -13,6 +13,9 @@ from .mpi import MPI, comm, size, rank, mpi_watch
 
 from . import EpcFile
 
+__all__ = ['Eigr2dFile']
+
+
 class Eigr2dFile(EpcFile):
 
     def read_nc(self, fname=None):

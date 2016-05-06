@@ -4,6 +4,8 @@ from ..core.constants import Ha2eV
 from ..core.util import report_runtime
 from ..core import EpcAnalyzer
 
+__all__ = ['compute_epc']
+
 
 @report_runtime
 def compute_epc(
@@ -23,6 +25,7 @@ def compute_epc(
         EIGR2D_fnames = list(),
         EIGI2D_fnames = list(),
         FAN_fnames = list(),
+        verbose=False,
         **kwargs):
     """
     Compute electron-phonon coupling related quantities, such as:
@@ -106,6 +109,7 @@ def compute_epc(
                        omega_range=omega_range,
                        smearing=smearing_Ha,
                        output=output,
+                       verbose=verbose,
                        **kwargs)
 
     # Compute renormalization

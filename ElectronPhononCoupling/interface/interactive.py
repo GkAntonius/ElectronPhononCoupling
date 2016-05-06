@@ -7,6 +7,9 @@ from ..core.mpi import comm, mpi_abort_if_exception, i_am_master
 
 from .compute_epc import compute_epc
 
+__all__ = ['run_interactive', 'get_user_input']
+
+
 def run_interactive():
     """Run the calculation after getting inputs interactively from the user."""
     with mpi_abort_if_exception():
@@ -38,6 +41,7 @@ def get_user_input():
         'EIGI2D_fnames' : list(),
         'FAN_fnames' : list(),
         'eig0_fname' : '',
+        'verbose' : True,
         }
 
     # Interaction with the user

@@ -11,6 +11,9 @@ from . import EpcFile
 
 from .mpi import MPI, comm, size, rank, mpi_watch
 
+__all__ = ['EigFile']
+
+
 class EigFile(EpcFile):
 
     def __init__(self, *args, **kwargs):

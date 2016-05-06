@@ -1,6 +1,7 @@
 from . import mpi
 from . import constants
-from .util import *
+from . import util
+from . import mathutil
 
 from .epcfile import *
 from .eigfile import *
@@ -8,6 +9,5 @@ from .ddbfile import *
 from .eigr2dfile import *
 from .fanfile import *
 
-from .mathutil import *
 from .qptanalyzer import *
 from .epcanalyzer import *

@@ -5,6 +5,7 @@ ElectronPhononCoupling/__init__.py
 ElectronPhononCoupling.egg-info/PKG-INFO
 ElectronPhononCoupling.egg-info/SOURCES.txt
 ElectronPhononCoupling.egg-info/dependency_links.txt
+ElectronPhononCoupling.egg-info/requires.txt
 ElectronPhononCoupling.egg-info/top_level.txt
 ElectronPhononCoupling/config/__init__.py
 ElectronPhononCoupling/config/release.py
@@ -49,6 +50,7 @@ ElectronPhononCoupling/data/data_LiF/odat_calc_DS2_EIG.nc
 ElectronPhononCoupling/data/data_LiF/odat_calc_DS8_DDB
 ElectronPhononCoupling/data/data_LiF/odat_calc_DS8_DDB.nc
 ElectronPhononCoupling/data/data_LiF/odat_calc_DS9_EIG.nc
+ElectronPhononCoupling/data/inputs_for_tests/runall-python.sh
 ElectronPhononCoupling/data/inputs_for_tests/runall.sh
 ElectronPhononCoupling/data/inputs_for_tests/t11.in
 ElectronPhononCoupling/data/inputs_for_tests/t11.py
@@ -143,7 +145,6 @@ ElectronPhononCoupling/data/outputs_of_tests/t41_REN.txt
 ElectronPhononCoupling/interface/__init__.py
 ElectronPhononCoupling/interface/compute_epc.py
 ElectronPhononCoupling/interface/interactive.py
-ElectronPhononCoupling/interface/temperature_para.py
 ElectronPhononCoupling/interface/tests/__init__.py
 ElectronPhononCoupling/interface/tests/test_interface.py
 ElectronPhononCoupling/scripts/electron-phonon-coupling
