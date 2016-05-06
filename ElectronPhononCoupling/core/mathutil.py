@@ -12,15 +12,3 @@ def delta_lorentzian(x, eta):
     """The lorentzian representation of a delta function."""
     return (eta / N.pi) / (x ** 2 + eta ** 2)
 
-
-def get_bose(natom, omega, temperatures):
-  bose = N.array(zeros((3*natom, len(temperatures))))
-  for imode in range(3*natom):
-    if omega[imode].real > tol6:
-      for tt, T in enumerate(temperatures):
-        if T > tol6:
-          x = omega[imode].real / (kb_HaK*T)
-          if x < 50.:
-            bose[imode,tt] = 1.0 / (N.exp(x) - 1)
-  return bose
-

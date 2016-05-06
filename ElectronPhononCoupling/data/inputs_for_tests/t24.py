@@ -55,13 +55,12 @@ nqpt = 3
 wtq = [0.125, 0.5, 0.375]
 
 epc = compute_epc(
-        ncpu=1,
         calc_type=2,
         write=True,
         output='output/t24',
         smearing_eV=0.01,
         temperature=True,
-        temp_info=[0,600,300],
+        temp_range=[0,600,300],
         lifetime=True,
         nqpt=nqpt,
         wtq=wtq,

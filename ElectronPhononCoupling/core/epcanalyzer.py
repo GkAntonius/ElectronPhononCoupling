@@ -12,7 +12,7 @@ from .util import create_directory, formatted_array_lines
 
 from .qptanalyzer import QptAnalyzer
 
-from .mpi import comm, size, rank, master, mpi_abort_if_exception, mpi_watch, i_am_master
+from .mpi import comm, size, rank, master_only, mpi_abort_if_exception, mpi_watch, i_am_master
 
 # =========================================================================== #
 
@@ -115,7 +115,7 @@ class EpcAnalyzer(object):
         self.set_smearing(smearing)
         self.set_output(output)
 
-    @master
+    @master_only
     def check_gamma(self):
         self.qptanalyzer.read_nonzero_files()
         if not self.qptanalyzer.is_gamma:
@@ -350,7 +350,7 @@ class EpcAnalyzer(object):
         self.self_energy = self.sum_qpt_function('get_zp_self_energy')
 
 
-    @master
+    @master_only
     def compute_spectral_function(self):
         """
         Compute the spectral function of all quasiparticles in the semi-static approximation,
@@ -368,7 +368,7 @@ class EpcAnalyzer(object):
                                 (omega - self.self_energy.real) ** 2 + self.self_energy.imag ** 2)
 
 
-    @master
+    @master_only
     def write_netcdf(self):
         """Write all data to a netCDF file."""
         fname = str(self.output) + '_EP.nc'
@@ -474,7 +474,7 @@ class EpcAnalyzer(object):
         ncfile.close()
 
 
-    @master
+    @master_only
     def write_renormalization(self):
         """Write the computed renormalization in a text file."""
         fname = str(self.output) + "_REN.txt"
@@ -498,7 +498,7 @@ class EpcAnalyzer(object):
                     O.write("{:>8.1f}  {:>12.8f}\n".format(T, ren))
 
 
-    @master
+    @master_only
     def write_broadening(self):
         """Write the computed broadening in a text file."""
         fname = str(self.output) + "_BRD.txt"

@@ -5,8 +5,6 @@ from numpy import zeros, ones, einsum
 
 from .constants import tol6, tol8, tol12, Ha2eV, kb_HaK
 
-from .mpi import comm, size, rank, master
-
 from .mathutil import delta_lorentzian
 from . import EigFile, Eigr2dFile, FanFile, DdbFile
 
@@ -780,9 +778,9 @@ class QptAnalyzer(object):
         in a static scheme from the EIGI2D files.
         """
     
-        nkpt = self.fan.nkpt
-        nband = self.fan.nband
-        natom = self.fan.natom
+        nkpt = self.eigi2d.nkpt
+        nband = self.eigi2d.nband
+        natom = self.eigi2d.natom
         ntemp = self.ntemp
           
         # These indicies be swapped at the end

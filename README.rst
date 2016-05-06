@@ -22,7 +22,7 @@ Usage
 
 Interactive usage:
 
-    >$ pp-temperature
+    >$ electron-phonon-coupling
 
 As a python module:
 

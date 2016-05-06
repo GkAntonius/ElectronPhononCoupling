@@ -1,10 +1,12 @@
-1           # number of cpu
 2           # dynamical
 output/t21  # output
 0.01        # smearing parameter
 n           # do not compute temperature dependance
 n           # do not compute lifetime
 3           # number of q-points
+0.125       # weight of the q-points
+0.5         #
+0.375       #
 ../data_LiF/odat_calc_DS8_DDB.nc
 ../data_LiF/odat_calc_DS12_DDB.nc
 ../data_LiF/odat_calc_DS16_DDB.nc

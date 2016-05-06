@@ -1,14 +1,14 @@
 #!/bin/sh
-pp-temperature < t11.in
-pp-temperature < t12.in
-pp-temperature < t13.in
-pp-temperature < t14.in
-pp-temperature < t21.in
-pp-temperature < t22.in
-pp-temperature < t23.in
-pp-temperature < t24.in
-pp-temperature < t31.in
-pp-temperature < t32.in
-pp-temperature < t33.in
-pp-temperature < t34.in
-pp-temperature < t41.in
+electron-phonon-coupling < t11.in
+electron-phonon-coupling < t12.in
+electron-phonon-coupling < t13.in
+electron-phonon-coupling < t14.in
+electron-phonon-coupling < t21.in
+electron-phonon-coupling < t22.in
+electron-phonon-coupling < t23.in
+electron-phonon-coupling < t24.in
+electron-phonon-coupling < t31.in
+electron-phonon-coupling < t32.in
+electron-phonon-coupling < t33.in
+electron-phonon-coupling < t34.in
+mpirun -n 2 electron-phonon-coupling < t41.in

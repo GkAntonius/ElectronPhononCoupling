@@ -26,7 +26,7 @@ def mpi_watch(f):
             return f(*args, **kwargs)
     return g
 
-def master(f):
+def master_only(f):
     """Decorator. Let a function be executed only by master."""
     def g(*args, **kwargs):
         if i_am_master:

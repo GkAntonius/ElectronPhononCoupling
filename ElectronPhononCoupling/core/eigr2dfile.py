@@ -9,7 +9,7 @@ import numpy as np
 from numpy import zeros
 import netCDF4 as nc
 
-from .mpi import MPI, comm, size, rank, master, mpi_watch
+from .mpi import MPI, comm, size, rank, mpi_watch
 
 from . import EpcFile
 

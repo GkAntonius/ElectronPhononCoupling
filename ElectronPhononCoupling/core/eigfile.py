@@ -9,7 +9,7 @@ import netCDF4 as nc
 
 from . import EpcFile
 
-from .mpi import MPI, comm, size, rank, master, mpi_watch
+from .mpi import MPI, comm, size, rank, mpi_watch
 
 class EigFile(EpcFile):
 
