@@ -39,6 +39,8 @@ class EpcAnalyzer(object):
     zero_point_broadening = None
     temperature_dependent_renormalization = None
     temperature_dependent_broadening = None
+    zero_point_renormalization_modes = None
+
 
     renormalization_is_dynamical = False
     broadening_is_dynamical = False
@@ -344,6 +346,16 @@ class EpcAnalyzer(object):
         self.zero_point_broadening = self.sum_qpt_function('get_zpb_static_active')
         self.broadening_is_dynamical = False
 
+    def compute_static_control_zp_renormalization_modes(self):
+        """
+        Compute the zero-point renormalization in a static scheme
+        with the transitions split between active and sternheimer.
+        Retain the mode decomposition of the zpr.
+        """
+
+        self.zero_point_renormalization_modes = self.sum_qpt_function('get_zpr_static_active_modes')
+        self.renormalization_is_dynamical = False
+
     def compute_self_energy(self):
         """
         Compute the zp frequency-dependent self-energy from one q-point.
@@ -402,6 +414,7 @@ class EpcAnalyzer(object):
         ncfile.createDimension('number_of_qpoints', self.nqpt)
         ncfile.createDimension('number_of_spins',len(root.dimensions['number_of_spins']))
         ncfile.createDimension('max_number_of_states',mband)
+        ncfile.createDimension('number_of_modes', 3 * len(root.dimensions['number_of_atoms']))
 
         ncfile.createDimension('number_of_temperature',len(self.temperatures))
         ncfile.createDimension('number_of_frequencies',len(self.omegase))
@@ -477,6 +490,11 @@ class EpcAnalyzer(object):
 
         if self.spectral_function is not None:
             spectral_function[0,:,:,:] = self.spectral_function[:,:,:]  # FIXME number of spin
+
+        zpr_modes = ncfile.createVariable('zero_point_renormalization_by_modes','d',
+            ('number_of_modes', 'number_of_spins', 'number_of_kpoints', 'max_number_of_states'))
+        if self.zero_point_renormalization_modes is not None:
+            zpr_modes[:,0,:,:] = zpr_modes[:,:,:]
 
         ncfile.close()
 

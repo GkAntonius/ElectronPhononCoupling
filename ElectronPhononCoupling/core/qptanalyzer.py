@@ -805,3 +805,82 @@ class QptAnalyzer(object):
 
         return self.tdb
 
+    def get_zpr_static_active_modes(self):
+        """
+        Compute the q-point zpr contribution in a static scheme,
+        with the transitions split between active and sternheimer.
+        Retain the mode decomposition of the zpr.
+        """
+    
+        nkpt = self.eigr2d.nkpt
+        nband = self.eigr2d.nband
+        natom = self.eigr2d.natom
+        nmodes = 3 * natom
+      
+        self.zpr = zeros((nmode, nkpt, nband), dtype=complex)
+      
+        fan_term = zeros((nmode, nkpt, nband), dtype=complex)
+        ddw_term = zeros((nmode, nkpt, nband), dtype=complex)
+        fan_active  = zeros((nmode, nkpt, nband), dtype=complex)
+        ddw_active  = zeros((nmode, nkpt, nband), dtype=complex)
+      
+        # Get reduced displacement (scaled with frequency)
+        displ_red_FAN2, displ_red_DDW2 = self.ddb.get_reduced_displ()
+
+        # First compute Sternheimer space
+      
+        # nmode, nkpt, nband
+        fan_term = einsum('ijklmn,olnkm->oij', self.eigr2d.EIG2D, displ_red_FAN2)
+        ddw_term = einsum('ijklmn,olnkm->oij', self.eigr2d0.EIG2D, displ_red_DDW2)
+
+        #fan_term = np.sum(fan_stern, axis=0)
+        #ddw_term = np.sum(ddw_stern, axis=0)
+      
+        # Now compute active space
+      
+        # nkpt, nband, nband, nmode
+        fan_addQ = einsum('ijklmno,plnkm->ijop', self.fan.FAN, displ_red_FAN2) 
+        ddw_addQ = einsum('ijklmno,plnkm->ijop', self.fan0.FAN, displ_red_DDW2) 
+    
+        # Enforce the diagonal coupling terms to be zero at Gamma
+        ddw_addQ = self.eig0.symmetrize_fan_degen(ddw_addQ)
+        if self.is_gamma:
+            fan_addQ = self.eig0.symmetrize_fan_degen(fan_addQ)
+
+        # nmode, nkpt, nband, nband
+        fan_tmp = einsum('ijkl->lijk', fan_addQ)
+        ddw_tmp = einsum('ijkl->lijk', ddw_addQ)
+        #fan_tmp = np.sum(fan_addQ, axis=3)
+        #ddw_tmp = np.sum(ddw_addQ, axis=3)
+      
+        # nkpt, nband, nband
+        delta_E = (einsum('ij,k->ijk', self.eig0.EIG[0,:,:].real, ones(nband))
+                 - einsum('ij,k->ikj', self.eigq.EIG[0,:,:].real, ones(nband)))
+    
+        # nkpt, nband, nband
+        delta_E_ddw = (einsum('ij,k->ijk', self.eig0.EIG[0,:,:].real, ones(nband))
+                     - einsum('ij,k->ikj', self.eig0.EIG[0,:,:].real, ones(nband)))
+    
+        # nkpt, nband, nband
+        div =  delta_E / (delta_E ** 2 + self.smearing ** 2)
+    
+        # nmode, nkpt, nband
+        fan_active = einsum('lijk,ijk->lij', fan_tmp, div)
+    
+        # nkpt, nband, nband
+        div_ddw = delta_E_ddw / (delta_E_ddw ** 2 + self.smearing ** 2)
+    
+        # nmode, nkpt, nband
+        ddw_active = einsum('lijk,ijk->lij', ddw_tmp, div_ddw)
+    
+      
+        # Correction from active space 
+        fan_term += fan_active
+        ddw_term += ddw_active
+    
+        self.zpr = (fan_term - ddw_term) * self.wtq
+    
+        self.zpr = self.eig0.make_average(self.zpr)
+      
+        return self.zpr
+
