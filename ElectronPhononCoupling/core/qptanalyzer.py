@@ -55,6 +55,10 @@ class QptAnalyzer(object):
         return self.ddb.qred
 
     @property
+    def omega(self):
+        return self.ddb.omega
+
+    @property
     def nomegase(self):
         return len(self.omegase)
 
@@ -68,6 +72,11 @@ class QptAnalyzer(object):
             if f.fname:
                 f.read_nc()
 
+        self.ddb.compute_dynmat()
+
+    def read_ddb(self):
+        """Read the ddb and diagonalize the matrix, setting omega."""
+        self.ddb.read_nc()
         self.ddb.compute_dynmat()
 
     def read_zero_files(self):
@@ -815,7 +824,7 @@ class QptAnalyzer(object):
         nkpt = self.eigr2d.nkpt
         nband = self.eigr2d.nband
         natom = self.eigr2d.natom
-        nmodes = 3 * natom
+        nmode = 3 * natom
       
         self.zpr = zeros((nmode, nkpt, nband), dtype=complex)
       

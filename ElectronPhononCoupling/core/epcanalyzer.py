@@ -35,6 +35,9 @@ class EpcAnalyzer(object):
     omegase = []
     smearing = None
 
+    qred = None
+    omega = None
+
     zero_point_renormalization = None
     zero_point_broadening = None
     temperature_dependent_renormalization = None
@@ -82,7 +85,7 @@ class EpcAnalyzer(object):
 
         # Set basic quantities
         self.nqpt = nqpt
-        self.wtq = np.array(wtq) / sum(wtq)
+        self.set_weights(wtq)
 
         # Set file names
         self.eig0_fname = eig0_fname
@@ -114,6 +117,7 @@ class EpcAnalyzer(object):
         # Get arrays dimensions
         self.nkpt = self.qptanalyzer.eigr2d0.nkpt
         self.nband = self.qptanalyzer.eigr2d0.nband
+        self.natom = self.qptanalyzer.eigr2d0.natom
         self.kpts = self.qptanalyzer.eigr2d0.kpt[:,:]
 
         # Set parameters
@@ -146,6 +150,12 @@ class EpcAnalyzer(object):
         self.temperatures = np.arange(*temp_range, dtype=float)
         self.qptanalyzer.temperatures = self.temperatures
 
+    def check_temperatures(self):
+        if not len(self.temperatures):
+            warnings.warn('Temperatures were not set. '
+                          'Please specify it with the "temp_range" '
+                          'keyword argument ')
+
     def set_omega_range(self, omega_range=(0, 0, 1)):
         """Set the minimum, makimum and step frequency for the self-energy."""
         self.omegase = np.arange(*omega_range, dtype=float)
@@ -160,6 +170,13 @@ class EpcAnalyzer(object):
     def set_output(self, root):
         """Set the root for output names."""
         self.output = root
+
+    def set_weights(self, wtq, normalize=True):
+        """Set the q-points weights."""
+        if normalize:
+            self.wtq = np.array(wtq) / sum(wtq)
+        else:
+            self.wtq = np.array(wtq)
 
     def set_iqpt(self, iqpt):
         """
@@ -182,6 +199,15 @@ class EpcAnalyzer(object):
             self.qptanalyzer.eigi2d.fname = self.EIGI2D_fnames[iqpt]
 
         self.qptanalyzer.read_nonzero_files()
+
+    def set_ddb(self, iqpt):
+        """
+        Give the qptanalyzer the weight and ddb file corresponding
+        to one particular qpoint, then read and diagonalize the dynamical matrix.
+        """
+        self.qptanalyzer.wtq = self.wtq[iqpt]
+        self.qptanalyzer.ddb.fname = self.DDB_fnames[iqpt]
+        self.qptanalyzer.read_ddb()
 
     @mpi_watch
     def distribute_workload(self):
@@ -224,9 +250,11 @@ class EpcAnalyzer(object):
                 for irank in active_ranks[1:]:
                     partial_sum = comm.recv(source=irank, tag=irank)
                     total += partial_sum
+
         elif self.active_worker:
             comm.send(partial_sum, dest=0, tag=rank)
             return
+
         else:
             return
 
@@ -267,6 +295,126 @@ class EpcAnalyzer(object):
 
         return total
 
+    @mpi_watch
+    def gather_qpt_function(self, func_name, *args, **kwargs):
+        """Call a certain function or each q-points and gather all results."""
+
+        partial = self.gather_qpt_function_me(func_name, *args, **kwargs)
+
+        if i_am_master:
+            total = np.zeros([self.nqpt] + list(partial.shape[1:]), dtype=partial.dtype)
+            for i, arr in enumerate(partial):
+                total[i,...] = arr[...]
+
+            active_ranks = self.get_active_ranks()
+            if len(active_ranks) > 1:
+                for irank in active_ranks[1:]:
+                    partial = comm.recv(source=irank, tag=irank)
+                    for arr in partial:
+                        i += 1
+                        total[i,...] = arr[...]
+
+        elif self.active_worker:
+            comm.send(partial, dest=0, tag=rank)
+            return
+
+        else:
+            return
+
+        # Now I could broadcast the total result to all workers
+        # but right now there is no need to.
+
+        return total
+
+    def gather_qpt_function_me(self, func_name, *args, **kwargs):
+        """Call a certain function or each q-points of this worker and gather all results."""
+        if not self.active_worker:
+            return None
+
+        nqpt_me = len(self.my_iqpts)
+
+        iqpt = self.my_iqpts[0]
+        self.set_iqpt(iqpt)
+
+        if self.verbose:
+            print("Q-point: {} with wtq = {} and reduced coord. {}".format(
+                  iqpt, self.qptanalyzer.wtq, self.qptanalyzer.qred))
+
+        q0 = np.array(getattr(self.qptanalyzer, func_name)(*args, **kwargs))
+        total = np.zeros([nqpt_me] + list(q0.shape), dtype=q0.dtype)
+
+        if len(self.my_iqpts) == 1:
+            return total
+
+        for i, iqpt in enumerate(self.my_iqpts[1:]):
+
+            self.set_iqpt(iqpt)
+
+            if self.verbose:
+                print("Q-point: {} with wtq = {} and reduced coord. {}".format(
+                      iqpt, self.qptanalyzer.wtq, self.qptanalyzer.qred))
+
+
+            qpt = getattr(self.qptanalyzer, func_name)(*args, **kwargs)
+            total[i+1,...] = qpt[...]
+
+        return total
+
+    @mpi_watch
+    def gather_qpt_info(self):
+        """Gather qpt reduced coordinates and mode frequencies."""
+
+        partial = self.gather_qpt_info_me()
+
+        if i_am_master:
+
+            qred_all = np.zeros((self.nqpt, 3), dtype=np.float)
+            omega_all = np.zeros((self.nqpt, 3 * self.natom), dtype=np.float)
+
+            qred_p, omega_p = partial
+            for i, (qred, omega) in enumerate(zip(qred_p, omega_p)):
+                qred_all[i,...] = qred[...]
+                omega_all[i,...] = omega[...]
+
+            active_ranks = self.get_active_ranks()
+            if len(active_ranks) > 1:
+                for irank in active_ranks[1:]:
+                    partial = comm.recv(source=irank, tag=10000+irank)
+                    qred_p, omega_p = partial
+                    for qred, omega in zip(qred_p, omega_p):
+                        i += 1
+                        qred_all[i,...] = qred[...]
+                        omega_all[i,...] = omega[...]
+
+        elif self.active_worker:
+            comm.send(partial, dest=0, tag=10000+rank)
+            return
+        else:
+            return
+
+        self.qred = qred_all
+        self.omega = omega_all
+
+        return self.qred, self.omega
+
+    def gather_qpt_info_me(self):
+        """Gather qpt reduced coordinates and mode frequencies."""
+        if not self.active_worker:
+            return None
+
+        nqpt_me = len(self.my_iqpts)
+
+        qred = np.zeros((nqpt_me, 3), dtype=np.float)
+        omega = np.zeros((nqpt_me, 3 * self.natom), dtype=np.float)
+
+        for i, iqpt in enumerate(self.my_iqpts):
+
+            self.set_ddb(iqpt)
+            qred[i,:] = self.qptanalyzer.qred[:]
+            omega[i,:] = np.real(self.qptanalyzer.omega[:])
+
+        return qred, omega
+
     def compute_static_zp_renormalization(self):
         """Compute the zero-point renormalization in a static scheme."""
         self.zero_point_renormalization = self.sum_qpt_function('get_zpr_static')
@@ -276,6 +424,7 @@ class EpcAnalyzer(object):
         """
         Compute the temperature-dependent renormalization in a static scheme.
         """
+        self.check_temperatures()
         self.temperature_dependent_renormalization = self.sum_qpt_function('get_tdr_static')
         self.renormalization_is_dynamical = False
 
@@ -283,6 +432,7 @@ class EpcAnalyzer(object):
         """
         Compute the temperature-dependent renormalization in a dynamical scheme.
         """
+        self.check_temperatures()
         self.temperature_dependent_renormalization = self.sum_qpt_function('get_tdr_dynamical')
         self.renormalization_is_dynamical = True
 
@@ -296,6 +446,7 @@ class EpcAnalyzer(object):
         Compute the temperature-dependent renormalization in a static scheme
         with the transitions split between active and sternheimer.
         """
+        self.check_temperatures()
         self.temperature_dependent_renormalization = self.sum_qpt_function('get_tdr_static_active')
         self.renormalization_is_dynamical = False
 
@@ -312,6 +463,7 @@ class EpcAnalyzer(object):
         Compute the temperature-dependent broadening in a static scheme
         from the EIGI2D files.
         """
+        self.check_temperatures()
         self.temperature_dependent_broadening = self.sum_qpt_function('get_tdb_static')
         self.broadening_is_dynamical = False
 
@@ -324,6 +476,7 @@ class EpcAnalyzer(object):
         self.broadening_is_dynamical = False
 
     def compute_dynamical_td_broadening(self):
+        self.check_temperatures()
         warnings.warn("Dynamical lifetime at finite temperature is not yet implemented...proceed with static lifetime")
         return self.compute_static_td_broadening()
 
@@ -335,6 +488,7 @@ class EpcAnalyzer(object):
         self.broadening_is_dynamical = True
 
     def compute_static_control_td_broadening(self):
+        self.check_temperatures()
         warnings.warn("Static lifetime at finite temperature with control over smearing is not yet implemented...proceed with static lifetime")
         return self.compute_static_td_broadening()
 
@@ -457,8 +611,8 @@ class EpcAnalyzer(object):
 
         if self.zero_point_renormalization is not None:
             zpr[0,:,:] = self.zero_point_renormalization[:,:].real  # FIXME number of spin
-            #fan[0,:,:] = self.fan_zero_point_renormalization[:,:].real  # FIXME number of spin
-            #ddw[0,:,:] = self.ddw_zero_point_renormalization[:,:].real  # FIXME number of spin
+            #fan[0,:,:] = self.fan_zero_point_renormalization[:,:].real
+            #ddw[0,:,:] = self.ddw_zero_point_renormalization[:,:].real
 
         data = ncfile.createVariable('temperature_dependent_renormalization','d',
             ('number_of_spins','number_of_kpoints', 'max_number_of_states','number_of_temperature'))
@@ -494,7 +648,15 @@ class EpcAnalyzer(object):
         zpr_modes = ncfile.createVariable('zero_point_renormalization_by_modes','d',
             ('number_of_modes', 'number_of_spins', 'number_of_kpoints', 'max_number_of_states'))
         if self.zero_point_renormalization_modes is not None:
-            zpr_modes[:,0,:,:] = zpr_modes[:,:,:]
+            zpr_modes[:,0,:,:] = self.zero_point_renormalization_modes[:,:,:]
+
+        data = ncfile.createVariable('reduced_coordinates_of_qpoints','d', ('number_of_qpoints', 'cartesian'))
+        if self.qred is not None:
+            data[...] = self.qred[...]
+
+        data = ncfile.createVariable('phonon_mode_frequencies','d', ('number_of_qpoints', 'number_of_modes'))
+        if self.omega is not None:
+            data[...] = self.omega[...]
 
         ncfile.close()
 
