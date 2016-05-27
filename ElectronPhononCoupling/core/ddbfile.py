@@ -136,7 +136,7 @@ class DdbFile(EpcFile):
     
         return self.omega, self.eigvect
     
-    def get_reduced_displ(self):
+    def get_reduced_displ_squared(self):
         """
         Compute the squared reduced displacements (scaled by phonon frequencies)
         for the Fan and the DDW terms.

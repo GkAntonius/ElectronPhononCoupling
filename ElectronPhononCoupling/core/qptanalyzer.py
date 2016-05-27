@@ -6,7 +6,7 @@ from numpy import zeros, ones, einsum
 from .constants import tol6, tol8, tol12, Ha2eV, kb_HaK
 
 from .mathutil import delta_lorentzian
-from . import EigFile, Eigr2dFile, FanFile, DdbFile
+from . import EigFile, Eigr2dFile, FanFile, DdbFile, GkkFile
 
 __author__ = "Gabriel Antonius, Samuel Ponce"
 
@@ -24,6 +24,8 @@ class QptAnalyzer(object):
                  EIGI2D_fname=None,
                  FAN_fname=None,
                  FAN0_fname=None,
+                 GKK_fname=None,
+                 GKK0_fname=None,
                  wtq=1.0,
                  smearing=0.00367,
                  temperatures=None,
@@ -40,11 +42,15 @@ class QptAnalyzer(object):
         self.eig0 = EigFile(eig0_fname, read=False)
         self.eigr2d0 = Eigr2dFile(EIGR2D0_fname, read=False)
         self.fan0 = FanFile(FAN0_fname, read=False)
+        self.gkk = GkkFile(GKK_fname, read=False)
+        self.gkk0 = GkkFile(GKK0_fname, read=False)
 
         self.wtq = wtq
         self.smearing = smearing
         self.omegase = omegase if omegase else list()
         self.temperatures = temperatures if temperatures else list()
+
+        self.use_gkk = bool(GKK_fname)
 
     @property
     def is_gamma(self):
@@ -68,7 +74,8 @@ class QptAnalyzer(object):
 
     def read_nonzero_files(self):
         """Read all nc files that are not specifically related to q=0."""
-        for f in (self.ddb, self.eigq, self.eigr2d, self.eigi2d, self.fan):
+        for f in (self.ddb, self.eigq, self.eigr2d, self.eigi2d,
+                  self.fan, self.gkk):
             if f.fname:
                 f.read_nc()
 
@@ -81,7 +88,7 @@ class QptAnalyzer(object):
 
     def read_zero_files(self):
         """Read all nc files that are not specifically related to q=0."""
-        for f in (self.eig0, self.eigr2d0, self.fan0):
+        for f in (self.eig0, self.eigr2d0, self.fan0, self.gkk0):
             if f.fname:
                 f.read_nc()
 
@@ -98,6 +105,50 @@ class QptAnalyzer(object):
         if self.fan0.fname:
             self.fan0.broadcast()
 
+        if self.gkk0.fname:
+            self.gkk0.broadcast()
+
+    def get_fan_ddw_sternheimer(self):
+        """
+        Compute the fan and ddw contribution to the self-energy
+        obtained from the Sternheimer equation.
+
+        Returns:
+            fan[nmode, nkpt, nband]
+            ddw[nmode, nkpt, nband]
+        """
+        # Get reduced displacement (scaled with frequency)
+        displ_red_FAN2, displ_red_DDW2 = self.ddb.get_reduced_displ_squared()
+
+        # nmode, nkpt, nband
+        fan = einsum('ijklmn,olnkm->oij', self.eigr2d.EIG2D, displ_red_FAN2)
+        ddw = einsum('ijklmn,olnkm->oij', self.eigr2d0.EIG2D, displ_red_DDW2)
+
+        return fan, ddw
+    
+    def get_fan_ddw_active(self):
+        """
+        Compute the squared gkk elements for the fan ddw terms.
+
+        Returns:
+            fan[nkpt, nband, nband, nmode]
+            ddw[nkpt, nband, nband, nmode]
+        """
+
+        # Get reduced displacement (scaled with frequency)
+        displ_red_FAN2, displ_red_DDW2 = self.ddb.get_reduced_displ_squared()
+
+        # nkpt, nband, nband, nmode
+        fan = einsum('ijklmno,plnkm->ijop', self.fan.FAN, displ_red_FAN2)
+        ddw = einsum('ijklmno,plnkm->ijop', self.fan0.FAN, displ_red_DDW2)
+
+        # Enforce the diagonal coupling terms to be zero at Gamma
+        ddw = self.eig0.symmetrize_fan_degen(ddw)
+        if self.is_gamma:
+            fan = self.eig0.symmetrize_fan_degen(fan)
+      
+        return fan, ddw
+    
 
     def get_zpr_static(self):
         """Compute the q-point zpr contribution in a static scheme."""
@@ -105,16 +156,12 @@ class QptAnalyzer(object):
         # First index is to separate zpr, fan, ddw
         self.zpr = zeros((self.eigr2d.nkpt, self.eigr2d.nband), dtype=complex)
     
-        # Get reduced displacement (scaled with frequency)
-        displ_red_FAN2, displ_red_DDW2 = self.ddb.get_reduced_displ()
-    
-        # Sum over (idir, iat, jdir, jat) to obtain (nmode, nkpt, nband)
-        fan_term = einsum('ijklmn,olnkm->oij', self.eigr2d.EIG2D, displ_red_FAN2)
-        ddw_term = einsum('ijklmn,olnkm->oij', self.eigr2d0.EIG2D, displ_red_DDW2)  
+        # nmode, nkpt, nband
+        fan_stern, ddw_stern = self.get_fan_ddw_sternheimer()
     
         # Sum all modes
-        fan_term = np.sum(fan_term, axis=0)
-        ddw_term = np.sum(ddw_term, axis=0)
+        fan_term = np.sum(fan_stern, axis=0)
+        ddw_term = np.sum(ddw_stern, axis=0)
     
         self.zpr = (fan_term - ddw_term) * self.wtq
     
@@ -139,33 +186,87 @@ class QptAnalyzer(object):
         fan_active  = zeros((nkpt, nband), dtype=complex)
         ddw_active  = zeros((nkpt, nband), dtype=complex)
       
-        # Get reduced displacement (scaled with frequency)
-        displ_red_FAN2, displ_red_DDW2 = self.ddb.get_reduced_displ()
-
-        # First compute Sternheimer space
+        # Sternheimer contribution
       
-        # nkpt, nband, nmode
-        fan_stern = einsum('ijklmn,olnkm->oij', self.eigr2d.EIG2D, displ_red_FAN2)
-        ddw_stern = einsum('ijklmn,olnkm->oij', self.eigr2d0.EIG2D, displ_red_DDW2)
+        # nmode, nkpt, nband
+        fan_stern, ddw_stern = self.get_fan_ddw_sternheimer()
       
         fan_term = np.sum(fan_stern, axis=0)
         ddw_term = np.sum(ddw_stern, axis=0)
       
-        # Now compute active space
+        # Active space contribution
       
         # nkpt, nband, nband, nmode
-        fan_addQ = einsum('ijklmno,plnkm->ijop', self.fan.FAN, displ_red_FAN2) 
-        ddw_addQ = einsum('ijklmno,plnkm->ijop', self.fan0.FAN, displ_red_DDW2) 
-    
-        # Enforce the diagonal coupling terms to be zero at Gamma
-        ddw_addQ = self.eig0.symmetrize_fan_degen(ddw_addQ)
-        if self.is_gamma:
-            fan_addQ = self.eig0.symmetrize_fan_degen(fan_addQ)
-      
+        fan_num, ddw_num = self.get_fan_ddw_active()
 
         # nkpt, nband, nband
-        fan_tmp = np.sum(fan_addQ, axis=3)
-        ddw_tmp = np.sum(ddw_addQ, axis=3)
+        fan_tmp = np.sum(fan_num, axis=3)
+        ddw_tmp = np.sum(ddw_num, axis=3)
+      
+        # nkpt, nband, nband
+        delta_E = (einsum('ij,k->ijk', self.eig0.EIG[0,:,:].real, ones(nband))
+                 - einsum('ij,k->ikj', self.eigq.EIG[0,:,:].real, ones(nband)))
+    
+        # nkpt, nband, nband
+        delta_E_ddw = (einsum('ij,k->ijk', self.eig0.EIG[0,:,:].real, ones(nband))
+                     - einsum('ij,k->ikj', self.eig0.EIG[0,:,:].real, ones(nband)))
+    
+        # nkpt, nband, nband
+        div =  delta_E / (delta_E ** 2 + self.smearing ** 2)
+    
+        # nkpt, nband
+        fan_active = einsum('ijk,ijk->ij', fan_tmp, div)
+    
+        # nkpt, nband, nband
+        div_ddw = delta_E_ddw / (delta_E_ddw ** 2 + self.smearing ** 2)
+    
+        # nkpt, nband
+        ddw_active = einsum('ijk,ijk->ij', ddw_tmp, div_ddw)
+    
+      
+        # Correction from active space 
+        fan_term += fan_active
+        ddw_term += ddw_active
+    
+        self.zpr = (fan_term - ddw_term) * self.wtq
+    
+        self.zpr = self.eig0.make_average(self.zpr)
+      
+        return self.zpr
+
+    def get_zpr_static_active(self):
+        """
+        Compute the q-point zpr contribution in a static scheme,
+        with the transitions split between active and sternheimer.
+        """
+    
+        nkpt = self.eigr2d.nkpt
+        nband = self.eigr2d.nband
+        natom = self.eigr2d.natom
+      
+        self.zpr = zeros((nkpt, nband), dtype=complex)
+      
+        fan_term = zeros((nkpt, nband), dtype=complex)
+        ddw_term = zeros((nkpt, nband), dtype=complex)
+        fan_active  = zeros((nkpt, nband), dtype=complex)
+        ddw_active  = zeros((nkpt, nband), dtype=complex)
+      
+        # Sternheimer contribution
+      
+        # nmode, nkpt, nband
+        fan_stern, ddw_stern = self.get_fan_ddw_sternheimer()
+      
+        fan_term = np.sum(fan_stern, axis=0)
+        ddw_term = np.sum(ddw_stern, axis=0)
+      
+        # Active space contribution
+      
+        # nkpt, nband, nband, nmode
+        fan_num, ddw_num = self.get_fan_ddw_active()
+
+        # nkpt, nband, nband
+        fan_tmp = np.sum(fan_num, axis=3)
+        ddw_tmp = np.sum(ddw_num, axis=3)
       
         # nkpt, nband, nband
         delta_E = (einsum('ij,k->ijk', self.eig0.EIG[0,:,:].real, ones(nband))
@@ -215,32 +316,21 @@ class QptAnalyzer(object):
         fan_active  = zeros((nkpt, nband), dtype=complex)
         ddw_active  = zeros((nkpt, nband), dtype=complex)
       
-        # Get reduced displacement (scaled with frequency)
-        displ_red_FAN2, displ_red_DDW2 = self.ddb.get_reduced_displ()
-
-        # First compute Sternheimer space
+        # Sternheimer contribution
       
-        # nkpt, nband, nmode
-        fan_stern = einsum('ijklmn,olnkm->oij', self.eigr2d.EIG2D, displ_red_FAN2)
-        ddw_stern = einsum('ijklmn,olnkm->oij', self.eigr2d0.EIG2D, displ_red_DDW2)
+        # nmode, nkpt, nband
+        fan_stern, ddw_stern = self.get_fan_ddw_sternheimer()
       
         fan_term = np.sum(fan_stern, axis=0)
         ddw_term = np.sum(ddw_stern, axis=0)
       
-        # Now compute active space
+        # Active space contribution
       
         # nkpt, nband, nband, nmode
-        fan_addQ = einsum('ijklmno,plnkm->ijop', self.fan.FAN, displ_red_FAN2) 
-        ddw_addQ = einsum('ijklmno,plnkm->ijop', self.fan0.FAN, displ_red_DDW2) 
-    
-        # Enforce the diagonal coupling terms to be zero at Gamma
-        ddw_addQ = self.eig0.symmetrize_fan_degen(ddw_addQ)
-        if self.is_gamma:
-            fan_addQ = self.eig0.symmetrize_fan_degen(fan_addQ)
-      
+        fan_num, ddw_num = self.get_fan_ddw_active()
     
         # nkpt, nband, nband
-        ddw_tmp = np.sum(ddw_addQ, axis=3)
+        ddw_tmp = np.sum(ddw_num, axis=3)
     
         # nband
         if any(self.eigr2d.occ[0,0,:] == 2.0):
@@ -282,7 +372,7 @@ class QptAnalyzer(object):
         div2 = einsum('i,jkil->lijk', occ, 1.0 / deno2)
     
         # nkpt, nband
-        fan_active = einsum('ijkl,lkij->ij', fan_addQ, div1 + div2)
+        fan_active = einsum('ijkl,lkij->ij', fan_num, div1 + div2)
     
       
         # Correction from active space 
@@ -311,10 +401,7 @@ class QptAnalyzer(object):
         else:
             occ = self.fan.occ[0,0,:]
     
-        self.zpb = zeros((nkpt, nband),dtype=complex)
-      
-        # Get reduced displacement (scaled with frequency)
-        displ_red_FAN2, displ_red_DDW2 = self.ddb.get_reduced_displ()
+        self.zpb = zeros((nkpt, nband), dtype=complex)
       
         # nmode
         omega = self.ddb.omega[:].real
@@ -322,11 +409,7 @@ class QptAnalyzer(object):
         fan_add  = zeros((nkpt,nband), dtype=complex)
       
         # nkpt, nband, nband, nmode
-        fan_addQ = einsum('ijklmno,plnkm->ijop', self.fan.FAN, displ_red_FAN2) 
-    
-        # Enforce the diagonal coupling terms to be zero at Gamma
-        if self.is_gamma:
-            fan_addQ = self.eig0.symmetrize_fan_degen(fan_addQ)
+        fan_num, ddw_num = self.get_fan_ddw_active()
       
         # nkpt, nband, nband
         delta_E = (einsum('ij,k->ijk', self.eig0.EIG[0,:,:].real, ones(nband))
@@ -354,7 +437,7 @@ class QptAnalyzer(object):
         deltas = term1 + term2
 
         # nkpt, nband
-        fan_add = einsum('ijkl,lkij->ij', fan_addQ, deltas)
+        fan_add = einsum('ijkl,lkij->ij', fan_num, deltas)
 
         # Correction from active space 
         self.zpb = fan_add * self.wtq
@@ -380,20 +463,13 @@ class QptAnalyzer(object):
     
         self.zpb = zeros((nkpt, nband), dtype=complex)
       
-        # Get reduced displacement (scaled with frequency)
-        displ_red_FAN2, displ_red_DDW2 = self.ddb.get_reduced_displ()
-      
         # nmode
         omega = self.ddb.omega[:].real
       
         fan_add  = zeros((nkpt,nband), dtype=complex)
     
         # nkpt, nband, nband, nmode
-        fan_addQ = einsum('ijklmno,plnkm->ijop', self.fan.FAN, displ_red_FAN2) 
-      
-        # Enforce the diagonal coupling terms to be zero at Gamma
-        if self.is_gamma:
-            fan_addQ = self.eig0.symmetrize_fan_degen(fan_addQ)
+        fan_num, ddw_num = self.get_fan_ddw_active()
       
         # nkpt, nband, nband
         delta_E = (einsum('ij,k->ijk', self.eig0.EIG[0,:,:].real, ones(nband))
@@ -409,7 +485,7 @@ class QptAnalyzer(object):
         deltasign = einsum('i,jki->ijk', num, delta)
     
         # nkpt, nband
-        fan_add = einsum('ijkl,kij->ij', fan_addQ, deltasign)
+        fan_add = einsum('ijkl,kij->ij', fan_num, deltasign)
       
         # Correction from active space 
         self.zpb = fan_add * self.wtq
@@ -430,7 +506,7 @@ class QptAnalyzer(object):
         self.zpb = zeros((nkpt, nband), dtype=complex)
     
         # Get reduced displacement (scaled with frequency)
-        displ_red_FAN2, displ_red_DDW2 = self.ddb.get_reduced_displ()
+        displ_red_FAN2, displ_red_DDW2 = self.ddb.get_reduced_displ_squared()
         
         fan_corrQ = einsum('ijklmn,olnkm->oij', self.eigi2d.EIG2D, displ_red_FAN2)
     
@@ -463,9 +539,6 @@ class QptAnalyzer(object):
       
         self.sigma = zeros((nkpt, nband, nomegase), dtype=complex)
       
-        # Get reduced displacement (scaled with frequency)
-        displ_red_FAN2, displ_red_DDW2 = self.ddb.get_reduced_displ()
-      
         # nmode
         omega = self.ddb.omega[:].real
     
@@ -474,33 +547,27 @@ class QptAnalyzer(object):
         fan_add  = zeros((nomegase, nkpt,nband), dtype=complex)
         ddw_add  = zeros((nkpt, nband), dtype=complex)
       
-        # fan_corrQ and ddw_corrQ contains the ZPR on Sternheimer space.
-        fan_corrQ = einsum('ijklmn,olnkm->oij', self.eigr2d.EIG2D, displ_red_FAN2)
-        fan_corrQ = einsum('oij,m->omij', fan_corrQ, ones(nomegase))
-        ddw_corrQ = einsum('ijklmn,olnkm->oij', self.eigr2d0.EIG2D, displ_red_DDW2)
+        # Sternheimer contribution
+      
+        # nmode, nkpt, nband
+        fan_stern, ddw_stern = self.get_fan_ddw_sternheimer()
+        fan_stern = einsum('oij,m->omij', fan_stern, ones(nomegase))
       
         # Sum Sternheimer (upper) contribution
-        fan_term = np.sum(fan_corrQ, axis=0)
-        ddw_term = np.sum(ddw_corrQ, axis=0)
+        fan_term = np.sum(fan_stern, axis=0)
+        ddw_term = np.sum(ddw_stern, axis=0)
       
-        # Now compute active space
+        # Active space contribution
       
         # nkpt, nband, nband, nmode
-        fan_addQ = einsum('ijklmno,plnkm->ijop', self.fan.FAN, displ_red_FAN2) 
-        ddw_addQ = einsum('ijklmno,plnkm->ijop', self.fan0.FAN, displ_red_DDW2) 
-    
-        # Enforce the diagonal coupling terms to be zero at Gamma
-        ddw_addQ = self.eig0.symmetrize_fan_degen(ddw_addQ)
-        if self.is_gamma:
-            fan_addQ = self.eig0.symmetrize_fan_degen(fan_addQ)
-      
+        fan_num, ddw_num = self.get_fan_ddw_active()
     
         # nkpt, nband, nband
-        ddw_tmp = np.sum(ddw_addQ, axis=3)
+        ddw_tmp = np.sum(ddw_num, axis=3)
     
         # nband
         if any(self.eigr2d.occ[0,0,:] == 2.0):
-            occ = self.eigr2d.occ[0,0,:]/2
+            o_gkkcc = self.eigr2d.occ[0,0,:]/2
         else:
             occ = self.eigr2d.occ[0,0,:]
     
@@ -552,7 +619,7 @@ class QptAnalyzer(object):
             del deno2
     
             # nomegase, nkpt, nband
-            fan_add += einsum('ijm,mijl->lij', fan_addQ[:,:,kband,:], div1 + div2)
+            fan_add += einsum('ijm,mijl->lij', fan_num[:,:,kband,:], div1 + div2)
     
             del div1, div2
       
@@ -578,19 +645,16 @@ class QptAnalyzer(object):
         # These indicies be swapped at the end
         self.tdr = zeros((self.ntemp, self.eigr2d.nkpt, self.eigr2d.nband), dtype=complex)
     
-        # Get reduced displacement (scaled with frequency)
-        displ_red_FAN2, displ_red_DDW2 = self.ddb.get_reduced_displ()
-    
         bose = self.ddb.get_bose(self.temperatures)
     
         fan_term = zeros((self.ntemp, self.eigr2d.nkpt, self.eigr2d.nband), dtype=complex)
         ddw_term = zeros((self.ntemp, self.eigr2d.nkpt, self.eigr2d.nband), dtype=complex)
     
-        fan_corrQ = einsum('ijklmn,olnkm->oij', self.eigr2d.EIG2D, displ_red_FAN2)
-        ddw_corrQ = einsum('ijklmn,olnkm->oij', self.eigr2d0.EIG2D, displ_red_DDW2)
-    
-        fan_term = einsum('ijk,il->ljk', fan_corrQ, 2*bose+1.)
-        ddw_term = einsum('ijk,il->ljk', ddw_corrQ, 2*bose+1.)
+        # nmode, nkpt, nband
+        fan_stern, ddw_stern = self.get_fan_ddw_sternheimer()
+      
+        fan_term = einsum('ijk,il->ljk', fan_stern, 2*bose+1.)
+        ddw_term = einsum('ijk,il->ljk', ddw_stern, 2*bose+1.)
     
         self.tdr = (fan_term - ddw_term) * self.wtq
     
@@ -617,9 +681,6 @@ class QptAnalyzer(object):
         # These indicies be swapped at the end
         self.tdr = zeros((ntemp, nkpt, nband), dtype=complex)
     
-        # Get reduced displacement (scaled with frequency)
-        displ_red_FAN2, displ_red_DDW2 = self.ddb.get_reduced_displ()
-    
         bose = self.ddb.get_bose(self.temperatures)
     
         fan_term =  zeros((ntemp, nkpt, nband), dtype=complex)
@@ -627,17 +688,16 @@ class QptAnalyzer(object):
         fan_add = zeros((ntemp, nkpt, nband),dtype=complex)
         ddw_add = zeros((ntemp, nkpt, nband),dtype=complex)
     
-        # Sternheimer part
-        fan_corrQ = einsum('ijklmn,olnkm->oij', self.eigr2d.EIG2D, displ_red_FAN2)
-        ddw_corrQ = einsum('ijklmn,olnkm->oij', self.eigr2d0.EIG2D, displ_red_DDW2)
+        # Sternheimer contribution
+      
+        # nmode, nkpt, nband
+        fan_stern, ddw_stern = self.get_fan_ddw_sternheimer()
+      
+        fan_term = einsum('ijk,il->ljk', fan_stern, 2*bose+1.0)
+        ddw_term = einsum('ijk,il->ljk', ddw_stern, 2*bose+1.0)
     
-        fan_term = einsum('ijk,il->ljk', fan_corrQ, 2*bose+1.0)
-        ddw_term = einsum('ijk,il->ljk', ddw_corrQ, 2*bose+1.0)
-    
-        # Now compute active space
-        fan_addQ = einsum('ijklmno,plnkm->ijop', self.fan.FAN, displ_red_FAN2)
-        ddw_addQ = einsum('ijklmno,plnkm->ijop', self.fan0.FAN, displ_red_DDW2)
-    
+        # Active space contribution
+        fan_num, ddw_num = self.get_fan_ddw_active()
     
         # ikpt,iband,jband      
         delta_E = (einsum('ij,k->ijk', self.eig0.EIG[0,:,:].real, ones(nband)) -
@@ -656,7 +716,7 @@ class QptAnalyzer(object):
         div =  einsum('ijklm,klm->ijklm', num, 1. / deno)
     
         #(ikpt,iband,jband,imode),(imode,ntemp,ikpt,iband,jband)->ntemp,ikpt,iband
-        fan_add = einsum('ijkl,lmijk->mij', fan_addQ, div)
+        fan_add = einsum('ijkl,lmijk->mij', fan_num, div)
     
         # imode,ntemp,ikpt,iband,jband
         num = einsum('ij,klm->ijklm', 2*bose+1., delta_E_ddw)
@@ -667,7 +727,7 @@ class QptAnalyzer(object):
         div =  einsum('ijklm,klm->ijklm', num, 1. / deno)
     
         #(ikpt,iband,jband,imode),(imode,ntemp,ikpt,iband,jband)->ntemp,ikpt,iband 
-        ddw_add = einsum('ijkl,lmijk->mij', ddw_addQ, div)
+        ddw_add = einsum('ijkl,lmijk->mij', ddw_num, div)
     
     
         fan_term += fan_add
@@ -695,9 +755,6 @@ class QptAnalyzer(object):
     
         self.tdr =  zeros((ntemp, nkpt, nband), dtype=complex)
     
-        # Get reduced displacement (scaled with frequency)
-        displ_red_FAN2, displ_red_DDW2 = self.ddb.get_reduced_displ()
-    
         bose = self.ddb.get_bose(self.temperatures)
     
         fan_term =  zeros((ntemp, nkpt, nband), dtype=complex)
@@ -705,17 +762,16 @@ class QptAnalyzer(object):
         fan_add = zeros((ntemp, nkpt, nband),dtype=complex)
         ddw_add = zeros((ntemp, nkpt, nband),dtype=complex)
     
-        # Sternheimer part
-        fan_corrQ = einsum('ijklmn,olnkm->oij', self.eigr2d.EIG2D, displ_red_FAN2)
-        ddw_corrQ = einsum('ijklmn,olnkm->oij', self.eigr2d0.EIG2D, displ_red_DDW2)
+        # Sternheimer contribution
+      
+        # nmode, nkpt, nband
+        fan_stern, ddw_stern = self.get_fan_ddw_sternheimer()
+      
+        fan_term = einsum('ijk,il->ljk', fan_stern, 2*bose+1.0)
+        ddw_term = einsum('ijk,il->ljk', ddw_stern, 2*bose+1.0)
     
-        fan_term = einsum('ijk,il->ljk', fan_corrQ, 2*bose+1.0)
-        ddw_term = einsum('ijk,il->ljk', ddw_corrQ, 2*bose+1.0)
-    
-        # Now compute active space
-        fan_addQ = einsum('ijklmno,plnkm->ijop', self.fan.FAN, displ_red_FAN2)
-        ddw_addQ = einsum('ijklmno,plnkm->ijop', self.fan0.FAN, displ_red_DDW2)
-    
+        # Active space contribution
+        fan_num, ddw_num = self.get_fan_ddw_active()
     
         # jband
         if np.any(self.eigr2d.occ[0,0,:] == 2.0):
@@ -728,7 +784,7 @@ class QptAnalyzer(object):
                        einsum('ij,k->ijk', ones((nkpt, nband)), (2*occ-1)) * self.smearing * 1j)
     
         # ntemp,ikpt,iband,jband
-        tmp = einsum('ijkl,lm->mijk', ddw_addQ, 2*bose+1.0)
+        tmp = einsum('ijkl,lm->mijk', ddw_num, 2*bose+1.0)
         ddw_add = einsum('ijkl,jkl->ijk', tmp, 1.0 / delta_E_ddw)
     
         # ikpt,iband,jband
@@ -765,7 +821,7 @@ class QptAnalyzer(object):
         #div2 = einsum('ijk,lmki->ijklm', num2, 1.0 / deno2)
     
         # ikpt,iband,jband,imode
-        fan_add = einsum('ijkl,lmkij->mij', fan_addQ, div1 + div2)
+        fan_add = einsum('ijkl,lmkij->mij', fan_num, div1 + div2)
     
 
         fan_term += fan_add
@@ -795,7 +851,7 @@ class QptAnalyzer(object):
         self.tdb = zeros((ntemp, nkpt, nband), dtype=complex)
     
         # Get reduced displacement (scaled with frequency)
-        displ_red_FAN2, displ_red_DDW2 = self.ddb.get_reduced_displ()
+        displ_red_FAN2, displ_red_DDW2 = self.ddb.get_reduced_displ_squared()
     
         bose = self.ddb.get_bose(self.temperatures)
     
@@ -833,34 +889,24 @@ class QptAnalyzer(object):
         fan_active  = zeros((nmode, nkpt, nband), dtype=complex)
         ddw_active  = zeros((nmode, nkpt, nband), dtype=complex)
       
-        # Get reduced displacement (scaled with frequency)
-        displ_red_FAN2, displ_red_DDW2 = self.ddb.get_reduced_displ()
-
-        # First compute Sternheimer space
+        # Sternheimer contribution
       
         # nmode, nkpt, nband
-        fan_term = einsum('ijklmn,olnkm->oij', self.eigr2d.EIG2D, displ_red_FAN2)
-        ddw_term = einsum('ijklmn,olnkm->oij', self.eigr2d0.EIG2D, displ_red_DDW2)
+        fan_stern, ddw_stern = self.get_fan_ddw_sternheimer()
 
         #fan_term = np.sum(fan_stern, axis=0)
         #ddw_term = np.sum(ddw_stern, axis=0)
       
-        # Now compute active space
+        # Active space contribution
       
         # nkpt, nband, nband, nmode
-        fan_addQ = einsum('ijklmno,plnkm->ijop', self.fan.FAN, displ_red_FAN2) 
-        ddw_addQ = einsum('ijklmno,plnkm->ijop', self.fan0.FAN, displ_red_DDW2) 
-    
-        # Enforce the diagonal coupling terms to be zero at Gamma
-        ddw_addQ = self.eig0.symmetrize_fan_degen(ddw_addQ)
-        if self.is_gamma:
-            fan_addQ = self.eig0.symmetrize_fan_degen(fan_addQ)
+        fan_num, ddw_num = self.get_fan_ddw_active()
 
         # nmode, nkpt, nband, nband
-        fan_tmp = einsum('ijkl->lijk', fan_addQ)
-        ddw_tmp = einsum('ijkl->lijk', ddw_addQ)
-        #fan_tmp = np.sum(fan_addQ, axis=3)
-        #ddw_tmp = np.sum(ddw_addQ, axis=3)
+        fan_tmp = einsum('ijkl->lijk', fan_num)
+        ddw_tmp = einsum('ijkl->lijk', ddw_num)
+        #fan_tmp = np.sum(fan_num, axis=3)
+        #ddw_tmp = np.sum(ddw_num, axis=3)
       
         # nkpt, nband, nband
         delta_E = (einsum('ij,k->ijk', self.eig0.EIG[0,:,:].real, ones(nband))
@@ -884,8 +930,8 @@ class QptAnalyzer(object):
     
       
         # Correction from active space 
-        fan_term += fan_active
-        ddw_term += ddw_active
+        fan_term = fan_stern + fan_active
+        ddw_term = ddw_stern + ddw_active
     
         self.zpr = (fan_term - ddw_term) * self.wtq
     

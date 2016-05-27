@@ -43,11 +43,11 @@ class GkkFile(EpcFile):
 
             # nband, natom, ncart, nkpt, product_mband_nsppol*2 
             GKKtmp = root.variables['second_derivative_eigenenergies_actif'][:,:,:,:,:]
-            GKKtmp2 = N.einsum('ijkno->nokji', GKKtmp)
+            GKKtmp2 = np.einsum('ijkno->nokji', GKKtmp)
             self.GKK = np.zeros((self.nkpt, self.nsppol*self.nband, 3, self.natom, self.nband), dtype=np.complex)
             self.GKK.real[...] = GKKtmp2[:, ::2, ...]
             self.GKK.imag[...] = GKKtmp2[:, 1::2, ...]
-            self.GKK = N.reshape(self.GKK,(self.nkpt,self.nsppol,self.nband,3,self.natom,self.nband))
+            self.GKK = np.reshape(self.GKK,(self.nkpt,self.nsppol,self.nband,3,self.natom,self.nband))
 
     @mpi_watch
     def broadcast(self):
@@ -68,8 +68,8 @@ class GkkFile(EpcFile):
 
             self.occ = np.empty((self.nsppol, self.nkpt, self.nband), dtype=np.float)
 
-            self.FAN = np.empty((self.nkpt, self.nband, 3, self.natom,
-                                 3, self.natom, self.nband), dtype=np.complex)
+            self.GKK = np.empty((self.nkpt,self.nsppol,self.nband,3,self.natom,self.nband),
+                                dtype=np.complex)
 
             self.eigenvalues = np.empty((self.nsppol, self.nkpt, self.nband), dtype=np.float)
 
@@ -80,7 +80,7 @@ class GkkFile(EpcFile):
             self.rprimd = np.empty((3, 3), dtype=np.float)
 
         comm.Bcast([self.occ, MPI.DOUBLE])
-        comm.Bcast([self.FAN, MPI.COMPLEX])
+        comm.Bcast([self.GKK, MPI.COMPLEX])
         comm.Bcast([self.eigenvalues, MPI.DOUBLE])
         comm.Bcast([self.kpt, MPI.DOUBLE])
         comm.Bcast([self.qred, MPI.DOUBLE])
