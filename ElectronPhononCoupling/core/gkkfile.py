@@ -6,7 +6,7 @@ __author__ = "Gabriel Antonius"
 import os
 
 import numpy as np
-from numpy import zeros
+from numpy import zeros, einsum
 import netCDF4 as nc
 
 from .mpi import MPI, comm, size, rank, mpi_watch
@@ -48,6 +48,25 @@ class GkkFile(EpcFile):
             self.GKK.real[...] = GKKtmp2[:, ::2, ...]
             self.GKK.imag[...] = GKKtmp2[:, 1::2, ...]
             self.GKK = np.reshape(self.GKK,(self.nkpt,self.nsppol,self.nband,3,self.natom,self.nband))
+
+    def get_gkk_squared(self):
+        """
+        Get squared values of gkk with  reordered indices.
+        Returns:
+            gkk2[nkpt,nband,3,natom,3,natom,nband]
+        """
+
+        # No spin polarization at the moment.
+
+        gkk2 = zeros((self.nkpt, self.nband, 3, self.natom, 3, self.natom,
+                      self.nband), dtype=np.complex)
+
+        # nkpt,nband,3,natom,3,natom,nband
+        gkk2 = einsum('ijklm,ijnom->ijklnom', self.GKK[:,0,...],
+                                              self.GKK[:,0,...].conjugate())
+
+        return gkk2
+
 
     @mpi_watch
     def broadcast(self):

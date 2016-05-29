@@ -18,6 +18,7 @@ ElectronPhononCoupling/core/eigr2dfile.py
 ElectronPhononCoupling/core/epcanalyzer.py
 ElectronPhononCoupling/core/epcfile.py
 ElectronPhononCoupling/core/fanfile.py
+ElectronPhononCoupling/core/gkkfile.py
 ElectronPhononCoupling/core/mathutil.py
 ElectronPhononCoupling/core/mpi.py
 ElectronPhononCoupling/core/qptanalyzer.py

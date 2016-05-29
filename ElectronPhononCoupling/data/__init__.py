@@ -37,6 +37,12 @@ LiF_FAN_fnames = [ pjoin(LiF_datadir, fname) for fname in """
                     odat_calc_DS18_FAN.nc
                    """.split() ]
 
+LiF_GKK_fnames = [ pjoin(LiF_datadir, fname) for fname in """
+                    odat_calc_DS10_GKK.nc
+                    odat_calc_DS14_GKK.nc
+                    odat_calc_DS18_GKK.nc
+                   """.split() ]
+
 LiF_EIG0_fname = pjoin(LiF_datadir, 'odat_calc_DS2_EIG.nc')
 
 
@@ -46,7 +52,8 @@ LiF_fnames = dict(
         DDB_fnames=LiF_DDB_fnames,
         EIGR2D_fnames=LiF_EIGR2D_fnames,
         EIGI2D_fnames=LiF_EIGI2D_fnames,
-        FAN_fnames=LiF_FAN_fnames,
+        #FAN_fnames=LiF_FAN_fnames,
+        GKK_fnames=LiF_GKK_fnames,
         )
 
 LiF_outputdir = pjoin(os.path.dirname(__file__), 'outputs_of_tests')

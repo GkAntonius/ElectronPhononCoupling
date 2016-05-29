@@ -83,13 +83,13 @@
  elph2_imagden18 0.01 eV
  elph2_imagden6 0.01 eV
  ieig2rf1 0
- ieig2rf10 4
+ ieig2rf10 5
  ieig2rf11 0
  ieig2rf13 0
- ieig2rf14 4
+ ieig2rf14 5
  ieig2rf15 0
  ieig2rf17 0
- ieig2rf18 4
+ ieig2rf18 5
  ieig2rf2 0
  ieig2rf3 0
  ieig2rf5 0

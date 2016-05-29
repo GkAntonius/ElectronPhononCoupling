@@ -62,6 +62,7 @@ class EpcAnalyzer(object):
                  EIGR2D_fnames=list(),
                  EIGI2D_fnames=list(),
                  FAN_fnames=list(),
+                 GKK_fnames=list(),
                  output='epc.out',
                  temp_range=[0,0,1],
                  omega_range=[0,0,1],
@@ -94,6 +95,7 @@ class EpcAnalyzer(object):
         self.EIGR2D_fnames = EIGR2D_fnames
         self.EIGI2D_fnames = EIGI2D_fnames
         self.FAN_fnames = FAN_fnames
+        self.GKK_fnames = GKK_fnames
 
         # Initialize a single QptAnalyzer
         self.qptanalyzer = QptAnalyzer(
@@ -102,6 +104,7 @@ class EpcAnalyzer(object):
             DDB_fname=self.DDB_fnames[0],
             EIGR2D0_fname=self.EIGR2D_fnames[0],
             FAN0_fname=self.FAN_fnames[0] if self.FAN_fnames else None,
+            GKK0_fname=self.GKK_fnames[0] if self.GKK_fnames else None,
             asr=asr,
             )
 
@@ -194,6 +197,9 @@ class EpcAnalyzer(object):
 
         if self.FAN_fnames:
             self.qptanalyzer.fan.fname = self.FAN_fnames[iqpt]
+
+        if self.GKK_fnames:
+            self.qptanalyzer.gkk.fname = self.GKK_fnames[iqpt]
 
         if self.EIGI2D_fnames:
             self.qptanalyzer.eigi2d.fname = self.EIGI2D_fnames[iqpt]

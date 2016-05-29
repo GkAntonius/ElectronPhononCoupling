@@ -50,7 +50,31 @@ class QptAnalyzer(object):
         self.omegase = omegase if omegase else list()
         self.temperatures = temperatures if temperatures else list()
 
-        self.use_gkk = bool(GKK_fname)
+    @property
+    def nkpt(self):
+        if self.eigr2d.fname:
+            return self.eigr2d.nkpt
+        elif self.fan.fname:
+            return self.fan.nkpt
+        elif self.gkk.fname:
+            return self.gkk.nkpt
+        else:
+            raise Exception("Don't know nkpt. No files to read.")
+
+    @property
+    def nband(self):
+        if self.eigr2d.fname:
+            return self.eigr2d.nband
+        elif self.fan.fname:
+            return self.fan.nband
+        elif self.gkk.fname:
+            return self.gkk.nband
+        else:
+            raise Exception("Don't know nband. No files to read.")
+
+    @property
+    def natom(self):
+        return self.ddb.natom
 
     @property
     def is_gamma(self):
@@ -71,6 +95,14 @@ class QptAnalyzer(object):
     @property
     def ntemp(self):
         return len(self.temperatures)
+
+    @property
+    def use_gkk(self):
+        return (bool(self.gkk.fname) and bool(self.gkk0.fname))
+
+    @property
+    def has_active(self):
+        return (bool(self.fan.fname) and bool(self.fan0.fname)) or self.use_gkk
 
     def read_nonzero_files(self):
         """Read all nc files that are not specifically related to q=0."""
@@ -108,6 +140,26 @@ class QptAnalyzer(object):
         if self.gkk0.fname:
             self.gkk0.broadcast()
 
+    def get_occ_nospin(self):
+        """
+        Get the occupations, being either 0 or 1, regardless of spinor.
+        Assumes a gapped system, where occupations are the same at all kpts. 
+        Returns: occ[nband]
+        """
+        if self.eigr2d.fname:
+            occ = self.eigr2d.occ[0,0,:]
+        elif self.fan.fname:
+            occ = self.fan.occ[0,0,:]
+        elif self.gkk.fname:
+            occ = self.gkk.occ[0,0,:]
+        else:
+            raise Exception("Don't know nband. No files to read.")
+
+        if any(occ == 2.0):
+            occ = occ / 2.0
+
+        return occ
+
     def get_fan_ddw_sternheimer(self):
         """
         Compute the fan and ddw contribution to the self-energy
@@ -135,12 +187,23 @@ class QptAnalyzer(object):
             ddw[nkpt, nband, nband, nmode]
         """
 
+        if not self.has_active:
+            raise Exception('You should provide GKK files or FAN files '
+                            'to compute active space contribution.')
+
         # Get reduced displacement (scaled with frequency)
         displ_red_FAN2, displ_red_DDW2 = self.ddb.get_reduced_displ_squared()
 
+        if self.use_gkk:
+            gkk2 = self.gkk.get_gkk_squared()
+            gkk02 = self.gkk0.get_gkk_squared()
+        else:
+            gkk2 = self.fan.FAN
+            gkk02 = self.fan0.FAN
+
         # nkpt, nband, nband, nmode
-        fan = einsum('ijklmno,plnkm->ijop', self.fan.FAN, displ_red_FAN2)
-        ddw = einsum('ijklmno,plnkm->ijop', self.fan0.FAN, displ_red_DDW2)
+        fan = einsum('ijklmno,plnkm->ijop', gkk2, displ_red_FAN2)
+        ddw = einsum('ijklmno,plnkm->ijop', gkk02, displ_red_DDW2)
 
         # Enforce the diagonal coupling terms to be zero at Gamma
         ddw = self.eig0.symmetrize_fan_degen(ddw)
@@ -391,15 +454,12 @@ class QptAnalyzer(object):
         Only take the active space contribution.
         """
     
-        nkpt = self.fan.nkpt
-        nband = self.fan.nband
-        natom = self.fan.natom
+        nkpt = self.nkpt
+        nband = self.nband
+        natom = self.natom
       
         # nband
-        if any(self.fan.occ[0,0,:] == 2.0):
-            occ = self.fan.occ[0,0,:] / 2
-        else:
-            occ = self.fan.occ[0,0,:]
+        occ = self.get_occ_nospin()
     
         self.zpb = zeros((nkpt, nband), dtype=complex)
       
@@ -451,15 +511,12 @@ class QptAnalyzer(object):
         Only take the active space contribution.
         """
     
-        nkpt = self.fan.nkpt
-        nband = self.fan.nband
-        natom = self.fan.natom
+        nkpt = self.nkpt
+        nband = self.nband
+        natom = self.natom
       
         # nband
-        if any(self.fan.occ[0,0,:] == 2.0):
-            occ = self.fan.occ[0,0,:] / 2
-        else:
-            occ = self.fan.occ[0,0,:]
+        occ = self.get_occ_nospin()
     
         self.zpb = zeros((nkpt, nband), dtype=complex)
       
@@ -566,10 +623,7 @@ class QptAnalyzer(object):
         ddw_tmp = np.sum(ddw_num, axis=3)
     
         # nband
-        if any(self.eigr2d.occ[0,0,:] == 2.0):
-            o_gkkcc = self.eigr2d.occ[0,0,:]/2
-        else:
-            occ = self.eigr2d.occ[0,0,:]
+        occ = self.get_occ_nospin()
     
         # nkpt, nband, nband
         delta_E_ddw = (einsum('ij,k->ijk', eig0[0,:,:].real, ones(nband))
@@ -774,10 +828,7 @@ class QptAnalyzer(object):
         fan_num, ddw_num = self.get_fan_ddw_active()
     
         # jband
-        if np.any(self.eigr2d.occ[0,0,:] == 2.0):
-            occ = self.eigr2d.occ[0,0,:] / 2
-        else:
-            occ = self.eigr2d.occ[0,0,:]
+        occ = self.get_occ_nospin()
     
         delta_E_ddw = (einsum('ij,k->ijk', self.eig0.EIG[0,:,:].real, ones(nband)) -
                        einsum('ij,k->ikj', self.eig0.EIG[0,:,:].real, ones(nband)) -
