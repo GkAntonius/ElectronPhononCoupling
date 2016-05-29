@@ -25,6 +25,7 @@ def compute_epc(
         EIGR2D_fnames = list(),
         EIGI2D_fnames = list(),
         FAN_fnames = list(),
+        GKK_fnames = list(),
         verbose=False,
         **kwargs):
     """
@@ -80,6 +81,9 @@ def compute_epc(
     FAN_fnames: ([])
         Names of _FAN.nc files
 
+    GKK_fnames: ([])
+        Names of _GKK.nc files
+
     eig0_fname: ('')
         Name of the _EIG.nc file for the eigenvalues being corrected
 
@@ -105,6 +109,7 @@ def compute_epc(
                        EIGR2D_fnames=EIGR2D_fnames,
                        EIGI2D_fnames=EIGI2D_fnames,
                        FAN_fnames=FAN_fnames,
+                       GKK_fnames=GKK_fnames,
                        temp_range=temp_range,
                        omega_range=omega_range,
                        smearing=smearing_Ha,

@@ -40,6 +40,7 @@ def get_user_input():
         'EIGR2D_fnames' : list(),
         'EIGI2D_fnames' : list(),
         'FAN_fnames' : list(),
+        'GKK_fnames' : list(),
         'eig0_fname' : '',
         'verbose' : True,
         }
@@ -178,14 +179,22 @@ through ABINIT option 'ieig2rf 4'
     
     # Get the path of the FAN files from user if dynamical calculation
     if (calc_type == 2 or calc_type == 3):
-      FAN_fnames = []
+      fnames = []
       for ii in N.arange(nqpt):
-        ui = get_user('Enter the name of the %s FAN file' %ii)
+        ui = get_user('Enter the name of the %s GKK or FAN file' %ii)
         if len(ui.split()) != 1:
           raise Exception("You should provide only 1 file")
         else:
-          FAN_fnames.append(ui.strip(' \t\n\r'))
-        arguments.update(FAN_fnames=FAN_fnames)
+          fnames.append(ui.strip(' \t\n\r'))
+        if fnames:
+            fname0 = fnames[0]
+            if fname0.endswith('FAN.nc'):
+                arguments.update(FAN_fnames=fnames)
+            elif fname0.endswith('GKK.nc'):
+                arguments.update(GKK_fnames=fnames)
+            else:
+                raise Exception('Extension not recognized. '
+                                'Expected GKK.nc or FAN.nc file.')
     
     # Take the EIG at Gamma
     ui = get_user('Enter the name of the unperturbed EIG.nc file at Gamma')
