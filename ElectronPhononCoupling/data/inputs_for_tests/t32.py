@@ -7,36 +7,36 @@ from ElectronPhononCoupling import compute_epc
 # =========================================================================== #
 
 DDB_fnames = """
-../data_LiF/odat_calc_DS8_DDB.nc
-../data_LiF/odat_calc_DS12_DDB.nc
-../data_LiF/odat_calc_DS16_DDB.nc
+../data_LiF/odat_calc_DS5_DDB.nc
+../data_LiF/odat_calc_DS9_DDB.nc
+../data_LiF/odat_calc_DS13_DDB.nc
 """.split()
 
 EIG_fnames = """
-../data_LiF/odat_calc_DS9_EIG.nc
-../data_LiF/odat_calc_DS13_EIG.nc
-../data_LiF/odat_calc_DS17_EIG.nc
+../data_LiF/odat_calc_DS6_EIG.nc
+../data_LiF/odat_calc_DS10_EIG.nc
+../data_LiF/odat_calc_DS14_EIG.nc
 """.split()
 
 EIGR2D_fnames = """
-../data_LiF/odat_calc_DS10_EIGR2D.nc
-../data_LiF/odat_calc_DS14_EIGR2D.nc
-../data_LiF/odat_calc_DS18_EIGR2D.nc
+../data_LiF/odat_calc_DS7_EIGR2D.nc
+../data_LiF/odat_calc_DS11_EIGR2D.nc
+../data_LiF/odat_calc_DS15_EIGR2D.nc
 """.split()
 
 EIGI2D_fnames = """
-../data_LiF/odat_calc_DS10_EIGI2D.nc
-../data_LiF/odat_calc_DS14_EIGI2D.nc
-../data_LiF/odat_calc_DS18_EIGI2D.nc
+../data_LiF/odat_calc_DS7_EIGI2D.nc
+../data_LiF/odat_calc_DS11_EIGI2D.nc
+../data_LiF/odat_calc_DS15_EIGI2D.nc
 """.split()
 
-FAN_fnames = """
-../data_LiF/odat_calc_DS10_FAN.nc
-../data_LiF/odat_calc_DS14_FAN.nc
-../data_LiF/odat_calc_DS18_FAN.nc
+GKK_fnames = """
+../data_LiF/odat_calc_DS7_GKK.nc
+../data_LiF/odat_calc_DS11_GKK.nc
+../data_LiF/odat_calc_DS15_GKK.nc
 """.split()
 
-EIG0_fname = '../data_LiF/odat_calc_DS2_EIG.nc'
+EIG0_fname = '../data_LiF/odat_calc_DS3_EIG.nc'
 
 
 fnames = dict(
@@ -45,7 +45,7 @@ fnames = dict(
         DDB_fnames=DDB_fnames,
         EIGR2D_fnames=EIGR2D_fnames,
         EIGI2D_fnames=EIGI2D_fnames,
-        FAN_fnames=FAN_fnames,
+        GKK_fnames=GKK_fnames,
         )
 
 # =========================================================================== #
@@ -64,7 +64,6 @@ epc = compute_epc(
         lifetime=False,
         nqpt=nqpt,
         wtq=wtq,
-        verbose=False,
         **fnames)
 
 

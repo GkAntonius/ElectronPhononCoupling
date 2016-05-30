@@ -33,6 +33,7 @@ ElectronPhononCoupling/data/data_LiF/odat_calc_DS10_EIGI2D.nc
 ElectronPhononCoupling/data/data_LiF/odat_calc_DS10_EIGR2D
 ElectronPhononCoupling/data/data_LiF/odat_calc_DS10_EIGR2D.nc
 ElectronPhononCoupling/data/data_LiF/odat_calc_DS10_FAN.nc
+ElectronPhononCoupling/data/data_LiF/odat_calc_DS10_GKK.nc
 ElectronPhononCoupling/data/data_LiF/odat_calc_DS12_DDB
 ElectronPhononCoupling/data/data_LiF/odat_calc_DS12_DDB.nc
 ElectronPhononCoupling/data/data_LiF/odat_calc_DS13_EIG.nc
@@ -40,6 +41,7 @@ ElectronPhononCoupling/data/data_LiF/odat_calc_DS14_EIGI2D.nc
 ElectronPhononCoupling/data/data_LiF/odat_calc_DS14_EIGR2D
 ElectronPhononCoupling/data/data_LiF/odat_calc_DS14_EIGR2D.nc
 ElectronPhononCoupling/data/data_LiF/odat_calc_DS14_FAN.nc
+ElectronPhononCoupling/data/data_LiF/odat_calc_DS14_GKK.nc
 ElectronPhononCoupling/data/data_LiF/odat_calc_DS16_DDB
 ElectronPhononCoupling/data/data_LiF/odat_calc_DS16_DDB.nc
 ElectronPhononCoupling/data/data_LiF/odat_calc_DS17_EIG.nc
@@ -47,6 +49,7 @@ ElectronPhononCoupling/data/data_LiF/odat_calc_DS18_EIGI2D.nc
 ElectronPhononCoupling/data/data_LiF/odat_calc_DS18_EIGR2D
 ElectronPhononCoupling/data/data_LiF/odat_calc_DS18_EIGR2D.nc
 ElectronPhononCoupling/data/data_LiF/odat_calc_DS18_FAN.nc
+ElectronPhononCoupling/data/data_LiF/odat_calc_DS18_GKK.nc
 ElectronPhononCoupling/data/data_LiF/odat_calc_DS2_EIG.nc
 ElectronPhononCoupling/data/data_LiF/odat_calc_DS8_DDB
 ElectronPhononCoupling/data/data_LiF/odat_calc_DS8_DDB.nc

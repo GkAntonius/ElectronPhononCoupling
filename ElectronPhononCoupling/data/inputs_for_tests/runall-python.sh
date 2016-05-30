@@ -11,4 +11,3 @@ python t31.py
 python t32.py
 python t33.py
 python t34.py
-mpirun -n 2 python t41.py

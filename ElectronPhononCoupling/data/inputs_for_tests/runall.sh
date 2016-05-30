@@ -11,4 +11,3 @@ electron-phonon-coupling < t31.in
 electron-phonon-coupling < t32.in
 electron-phonon-coupling < t33.in
 electron-phonon-coupling < t34.in
-mpirun -n 2 electron-phonon-coupling < t41.in
