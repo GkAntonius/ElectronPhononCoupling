@@ -10,7 +10,7 @@ tmp
 
 # Files produced by the setup script
 *.pyc
-BGWpy.egg-info
+ElectronPhononCoupling.egg-info
 build
 build/*
 dist/*/
