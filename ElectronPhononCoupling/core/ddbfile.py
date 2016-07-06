@@ -10,7 +10,7 @@ import numpy as np
 from numpy import zeros
 import netCDF4 as nc
 
-from .constants import tol6, me_amu, kb_HaK
+from .constants import tol5, tol6, me_amu, kb_HaK
 from . import EpcFile
 
 __all__ = ['DdbFile']
@@ -30,6 +30,8 @@ class DdbFile(EpcFile):
     def read_nc(self, fname=None):
         """Open the DDB.nc file and read it."""
         fname = fname if fname else self.fname
+
+        super(DdbFile, self).read_nc(fname)
 
         with nc.Dataset(fname, 'r') as root:
 
@@ -152,7 +154,7 @@ class DdbFile(EpcFile):
         for imode in np.arange(3*natom):
 
           # Skip mode with zero frequency (leave displacements null)
-          if omega[imode].real < tol6:
+          if omega[imode].real < tol5:
             continue
 
           for iatom1 in np.arange(natom):
