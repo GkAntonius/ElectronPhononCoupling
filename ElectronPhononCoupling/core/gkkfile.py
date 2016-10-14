@@ -69,6 +69,24 @@ class GkkFile(EpcFile):
 
         return gkk2
 
+    def get_kpt_gkk_squared(self, ikpt):
+        """
+        Get squared values of gkk with  reordered indices for a ginven k-point.
+        Returns:
+            gkk2[nband,3,natom,3,natom,nband]
+        """
+
+        # No spin polarization at the moment.
+
+        gkk2 = zeros((self.nband, 3, self.natom, 3, self.natom,
+                      self.nband), dtype=np.complex)
+
+        # nkpt,nband,3,natom,3,natom,nband
+        gkk2 = einsum('jklm,jnom->jklnom', self.GKK[ikpt,0,...],
+                                           self.GKK[ikpt,0,...].conjugate())
+
+        return gkk2
+
 
     @mpi_watch
     def broadcast(self):

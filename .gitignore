@@ -3,6 +3,7 @@
 Tests
 tags
 TODO
+dev
 
 # Temporary files
 *.swp
@@ -16,3 +17,5 @@ build/*
 dist/*/
 dist/*.egg
 
+# Files produced by the tests
+ElectronPhononCoupling/data/inputs-for-tests/output

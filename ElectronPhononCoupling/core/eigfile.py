@@ -31,6 +31,8 @@ class EigFile(EpcFile):
             self.EIG = root.variables['Eigenvalues'][:,:,:] 
             self.Kptns = root.variables['Kptns'][:,:]
 
+            self.nspin, self.nkpt, self.nband = self.EIG.shape
+
     @mpi_watch
     def broadcast(self):
         """Broadcast the data from master to all workers."""
@@ -41,6 +43,7 @@ class EigFile(EpcFile):
             dim = np.array([nspin, nkpt, nband], dtype=np.int)
         else:
             dim = np.empty(3, dtype=np.int)
+            self.nspin, self.nkpt, self.nband = dim
 
         comm.Bcast([dim, MPI.INT])
 
