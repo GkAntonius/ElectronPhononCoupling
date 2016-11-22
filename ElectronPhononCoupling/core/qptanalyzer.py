@@ -169,13 +169,13 @@ class QptAnalyzer(object):
     def get_max_val(self):
         """Get the maximum valence band energy."""
         occ0 = self.get_occ_nospin()
-        nband_occ = sum(occ0[0])
+        nband_occ = int(sum(occ0[0]))
         return np.max(self.eigq.EIG[0,:,nband_occ-1])
 
     def get_min_cond(self):
         """Get the minimum conduction band energy."""
         occ0 = self.get_occ_nospin()
-        nband_occ = sum(occ0[0])
+        nband_occ = int(sum(occ0[0]))
         return np.min(self.eigq.EIG[0,:,nband_occ])
 
     def find_fermi_level(self):
