@@ -569,6 +569,10 @@ class EpcAnalyzer(object):
             Simga'_kn(omega,T) = Sigma_kn(omega + E^0_kn,T)
     
         """
+        # Make sure the fermi level is set
+        if self.mu is None:
+            self.find_fermi_level()
+
         self.self_energy_T = self.sum_qpt_function('get_td_self_energy')
 
     @master_only
