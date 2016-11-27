@@ -12,7 +12,7 @@ from .util import create_directory, formatted_array_lines
 
 from .qptanalyzer import QptAnalyzer
 
-from .mpi import comm, size, rank, master_only, mpi_watch, i_am_master
+from .mpi import MPI, comm, size, rank, master_only, mpi_watch, i_am_master
 
 # =========================================================================== #
 
@@ -72,6 +72,7 @@ class EpcAnalyzer(object):
                  smearing=0.00367,
                  asr=True,
                  fermi_level = None,
+                 wtkpt = list(),
                  verbose=False,
                  **kwargs):
 
@@ -92,6 +93,9 @@ class EpcAnalyzer(object):
         self.nqpt = nqpt
         self.set_weights(wtq)
 
+        # for selective kpts
+        self.wtkpt = wtkpt
+
         # Set file names
         self.eig0_fname = eig0_fname
         self.eigq_fnames = eigq_fnames
@@ -110,6 +114,7 @@ class EpcAnalyzer(object):
             FAN0_fname=self.FAN_fnames[0] if self.FAN_fnames else None,
             GKK0_fname=self.GKK_fnames[0] if self.GKK_fnames else None,
             asr=asr,
+            wtkpt=self.wtkpt,
             )
 
         # Read the first DDB and check that it is Gamma
@@ -198,8 +203,8 @@ class EpcAnalyzer(object):
         Find the Fermi level by gathering information from all workers
         and broadcast the result.
         """
-        all_max_val = gather_qpt_function('get_max_val')
-        all_min_cond = gather_qpt_function('get_min_cond')
+        all_max_val = self.gather_qpt_function('get_max_val')
+        all_min_cond = self.gather_qpt_function('get_min_cond')
         if i_am_master:
             max_val = np.max(all_max_val)
             min_cond = np.min(all_min_cond)
@@ -557,6 +562,9 @@ class EpcAnalyzer(object):
             Simga'_kn(omega) = Sigma_kn(omega + E^0_kn)
     
         """
+        if self.wtkpt:
+           print('\nSelective kpoints not yet supported for zero point spectral function...\n')
+
         self.self_energy = self.sum_qpt_function('get_zp_self_energy')
 
     def compute_td_self_energy(self):
@@ -573,7 +581,10 @@ class EpcAnalyzer(object):
         if self.mu is None:
             self.find_fermi_level()
 
-        self.self_energy_T = self.sum_qpt_function('get_td_self_energy')
+        if self.wtkpt:
+           self.self_energy_T = self.sum_qpt_function('get_nkb_td_self_energy')
+        else:
+           self.self_energy_T = self.sum_qpt_function('get_td_self_energy')
 
     @master_only
     def compute_zp_spectral_function(self):
@@ -587,8 +598,13 @@ class EpcAnalyzer(object):
             A'_kn(omega) = A_kn(omega + E^0_kn)
 
         """
-        self.spectral_function = np.zeros((self.nomegase, self.nkpt, self.nband), dtype=float)
-        omega = np.einsum('ij,l->ijl', np.ones((self.nkpt, self.nband)), self.omegase)
+        nkpt = self.nkpt
+        if self.wtkpt:
+        #   nkpt = len(self.wtkpt)
+           print('\nSelective kpoints not yet supported in zero point spectral function...\n')
+
+        self.spectral_function = np.zeros((self.nomegase, nkpt, self.nband), dtype=float)
+        omega = np.einsum('ij,l->ijl', np.ones((nkpt, self.nband)), self.omegase)
         self.spectral_function = (1 / np.pi) * np.abs(self.self_energy.imag) / (
                                 (omega - self.self_energy.real) ** 2 + self.self_energy.imag ** 2)
 
@@ -604,8 +620,14 @@ class EpcAnalyzer(object):
             A'_kn(omega) = A_kn(omega + E^0_kn)
 
         """
-        self.spectral_function_T = np.zeros((self.nomegase, self.ntemp, self.nkpt, self.nband), dtype=float)
-        omega = np.einsum('ijt,l->ijlt', np.ones((self.nkpt, self.nband, self.ntemp)), self.omegase)
+        if self.wtkpt:
+           nkpt = len(self.wtkpt)
+           print('Only results at selective kpts are saved.')
+        else:
+           nkpt = self.nkpt
+
+        self.spectral_function_T = np.zeros((self.nomegase, self.ntemp, nkpt, self.nband), dtype=float)
+        omega = np.einsum('ijt,l->ijlt', np.ones((nkpt, self.nband, self.ntemp)), self.omegase)
         self.spectral_function_T = (1 / np.pi) * np.abs(self.self_energy_T.imag) / (
                                 (omega - self.self_energy_T.real) ** 2 + self.self_energy_T.imag ** 2)
 
@@ -641,6 +663,7 @@ class EpcAnalyzer(object):
 
         ncfile.createDimension('number_of_temperature',len(self.temperatures))
         ncfile.createDimension('number_of_frequencies',len(self.omegase))
+        ncfile.createDimension('number_of_selective_kpoints',len(self.wtkpt))
 
         # Create variable
         data = ncfile.createVariable('reduced_coordinates_of_kpoints','d',('number_of_kpoints','cartesian'))
@@ -668,6 +691,9 @@ class EpcAnalyzer(object):
 
         data = ncfile.createVariable('omegase','d',('number_of_frequencies'))
         data[:] = self.omegase[:]
+
+        data = ncfile.createVariable('selective_kpoints','d',('number_of_selective_kpoints'))
+        data[:] = self.wtkpt[:]
 
         zpr = ncfile.createVariable('zero_point_renormalization','d',
             ('number_of_spins', 'number_of_kpoints', 'max_number_of_states'))
@@ -701,36 +727,55 @@ class EpcAnalyzer(object):
         if self.temperature_dependent_broadening is not None:
             data[0,:,:,:] = self.temperature_dependent_broadening[:,:,:].real  # FIXME number of spin
 
+        #if self.wtkpt:
+        #   self_energy = ncfile.createVariable('self_energy','d',
+        #      ('number_of_spins', 'number_of_selective_kpoints', 'max_number_of_states', 'number_of_frequencies', 'cplex'))
+        #else:
         self_energy = ncfile.createVariable('self_energy','d',
-            ('number_of_spins', 'number_of_kpoints', 'max_number_of_states', 'number_of_frequencies', 'cplex'))
+           ('number_of_spins', 'number_of_kpoints', 'max_number_of_states', 'number_of_frequencies', 'cplex'))
 
         if self.self_energy is not None:
             self_energy[0,:,:,:,0] = self.self_energy[:,:,:].real  # FIXME number of spin
             self_energy[0,:,:,:,1] = self.self_energy[:,:,:].imag  # FIXME number of spin
 
-        self_energy_T = ncfile.createVariable('self_energy_temperature_dependent','d',
-            ('number_of_spins', 'number_of_kpoints', 'max_number_of_states',
-             'number_of_frequencies', 'number_of_temperature', 'cplex'))
+        if self.wtkpt:
+           self_energy_T = ncfile.createVariable('self_energy_temperature_dependent','d',
+             ('number_of_spins', 'number_of_selective_kpoints', 'max_number_of_states',
+              'number_of_frequencies', 'number_of_temperature', 'cplex'))
+        else:
+           self_energy_T = ncfile.createVariable('self_energy_temperature_dependent','d',
+             ('number_of_spins', 'number_of_kpoints', 'max_number_of_states',
+              'number_of_frequencies', 'number_of_temperature', 'cplex'))
 
-        if self.self_energy is not None:
+        if self.self_energy_T is not None:
             self_energy_T[0,:,:,:,:,0] = self.self_energy_T[:,:,:,:].real  # FIXME number of spin
             self_energy_T[0,:,:,:,:,1] = self.self_energy_T[:,:,:,:].imag  # FIXME number of spin
 
+        #if self.wtkpt:
+        #   spectral_function = ncfile.createVariable('spectral_function','d',
+        #      ('number_of_spins', 'number_of_selective_kpoints', 'max_number_of_states', 'number_of_frequencies'))
+        #else:
         spectral_function = ncfile.createVariable('spectral_function','d',
-            ('number_of_spins', 'number_of_kpoints', 'max_number_of_states', 'number_of_frequencies'))
+           ('number_of_spins', 'number_of_kpoints', 'max_number_of_states', 'number_of_frequencies'))
 
         if self.spectral_function is not None:
             spectral_function[0,:,:,:] = self.spectral_function[:,:,:]  # FIXME number of spin
 
-        spectral_function_T = ncfile.createVariable('spectral_function_temperature_dependent','d',
-            ('number_of_spins', 'number_of_kpoints', 'max_number_of_states',
-             'number_of_frequencies', 'number_of_temperature'))
+        if self.wtkpt:
+           spectral_function_T = ncfile.createVariable('spectral_function_temperature_dependent','d',
+              ('number_of_spins', 'number_of_selective_kpoints', 'max_number_of_states',
+               'number_of_frequencies', 'number_of_temperature'))
+        else:
+           spectral_function_T = ncfile.createVariable('spectral_function_temperature_dependent','d',
+              ('number_of_spins', 'number_of_kpoints', 'max_number_of_states',
+               'number_of_frequencies', 'number_of_temperature'))
+  
 
         if self.spectral_function_T is not None:
             spectral_function_T[0,:,:,:,:] = self.spectral_function_T[:,:,:,:]  # FIXME number of spin
 
         zpr_modes = ncfile.createVariable('zero_point_renormalization_by_modes','d',
-            ('number_of_modes', 'number_of_spins', 'number_of_kpoints', 'max_number_of_states'))
+           ('number_of_modes', 'number_of_spins', 'number_of_kpoints', 'max_number_of_states'))
         if self.zero_point_renormalization_modes is not None:
             zpr_modes[:,0,:,:] = self.zero_point_renormalization_modes[:,:,:]
 

@@ -45,7 +45,6 @@ def get_user_input():
         'eig0_fname' : '',
         'verbose' : True,
         'wtkpt'   : list(),
-        'wtband'  : list(),
         }
 
     # Interaction with the user
@@ -107,12 +106,14 @@ through ABINIT option 'ieig2rf 4'
       omega_range = map(float, ui.split())
       arguments.update(omega_range=omega_range)
     # desired kpt range and band range for spectral function calculation  
-      ui = get_user('Introduce a list of kpts which you want to compute spectral functions.')
-      wtkpt = map(int, ui.split())
+      ui = get_user('Do you want to compute selective kpoints only? [y/n]')
+      fewk = ui.split()[0]
+      if fewk.lower() == 'y':
+         ui = get_user('Introduce a list of kpts which you want to compute spectral functions.')
+         wtkpt = map(int, ui.split())
+      else:
+         wtkpt = list()
       arguments.update(wtkpt=wtkpt)
-      ui = get_user('Introduce a list of bands which you want to compute spectral functions.')
-      wtband = map(int, ui.split())
-      arguments.update(wtband=wtband)
 
 
     # Temperature dependence analysis?
@@ -125,7 +126,7 @@ through ABINIT option 'ieig2rf 4'
       temperature = False
 
     if temperature:
-      ui = get_user('Introduce the starting temperature, max temperature and steps. e.g. 0 2000 100. (Only the first is used in the spectral function calculation)')
+      ui = get_user('Introduce the starting temperature, max temperature and steps. e.g. 0 2000 100.')
       temp_range = map(float, ui.split())
       arguments.update(temp_range=temp_range)
     
