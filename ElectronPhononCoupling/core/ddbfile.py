@@ -127,7 +127,8 @@ class DdbFile(EpcFile):
         for ii in np.arange(self.natom):
           jj = self.typat[ii]
           amu[ii] = self.amu[jj-1]
-    
+
+        self.gprimd = np.linalg.inv(np.matrix(self.rprim*self.acell))
         # Transform from 2nd-order matrix (non-cartesian coordinates, 
         # masses not included, asr not included ) from self to
         # dynamical matrix, in cartesian coordinates, asr not imposed.
@@ -182,7 +183,8 @@ class DdbFile(EpcFile):
         # Frequencies
         self.omega = np.sqrt(eigval)
         self.eigvect = eigvect
-    
+   
+ 
         return self.omega, self.eigvect
     
     def get_reduced_displ_squared(self):
@@ -378,4 +380,5 @@ class DdbFile(EpcFile):
             Flag = 3
             self.E2D = zeros((3,self.natom,3,self.natom),dtype=complex)
 
-
+      # seems the E2D should be permuted to (self.natom,3,self.natom,3)
+      self.E2D = np.transpose(self.E2D, (1,0,3,2))

@@ -785,6 +785,7 @@ class EpcAnalyzer(object):
 
         data = ncfile.createVariable('phonon_mode_frequencies','d', ('number_of_qpoints', 'number_of_modes'))
         if self.omega is not None:
+            print('self.omega', self.omega[0])
             data[...] = self.omega[...]
 
         ncfile.close()
