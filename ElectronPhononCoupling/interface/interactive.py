@@ -34,6 +34,7 @@ def get_user_input():
         'smearing_eV' : 3.6749e-4,
         'temperature' : False,
         'temp_range' : [0, 0, 1],
+        'omega_range' : [-1, 1, 0.5],
         'lifetime' : False,
         'DDB_fnames' : list(),
         'eigq_fnames' : list(),
@@ -43,6 +44,7 @@ def get_user_input():
         'GKK_fnames' : list(),
         'eig0_fname' : '',
         'verbose' : True,
+        'wtkpt'   : list(),
         }
 
     # Interaction with the user
@@ -91,13 +93,29 @@ through ABINIT option 'ieig2rf 4'
     arguments.update(output=output)
     
     # Enter the value of the smearing parameter for dynamic AHC
-    if (calc_type == 2 or calc_type == 3 ):
+    if (calc_type == 2 or calc_type >= 3 ):
       ui = get_user('Enter value of the smearing parameter (in eV)')
       smearing_eV = N.float(ui)
     else:
       smearing_eV = None
     arguments.update(smearing_eV=smearing_eV)
-    
+   
+    # frequency range
+    if calc_type == 4:
+      ui = get_user('Introduce the starting frequency, max frequency and steps. e.g. -1 1 0.05')
+      omega_range = map(float, ui.split())
+      arguments.update(omega_range=omega_range)
+    # desired kpt range and band range for spectral function calculation  
+      ui = get_user('Do you want to compute selective kpoints only? [y/n]')
+      fewk = ui.split()[0]
+      if fewk.lower() == 'y':
+         ui = get_user('Introduce a list of kpts which you want to compute spectral functions.')
+         wtkpt = map(int, ui.split())
+      else:
+         wtkpt = list()
+      arguments.update(wtkpt=wtkpt)
+
+
     # Temperature dependence analysis?
     ui = get_user('Do you want to compute the change of eigenergies with temperature? [y/n]')
     temperature = ui.split()[0]
@@ -108,7 +126,7 @@ through ABINIT option 'ieig2rf 4'
       temperature = False
 
     if temperature:
-      ui = get_user('Introduce the starting temperature, max temperature and steps. e.g. 0 2000 100')
+      ui = get_user('Introduce the starting temperature, max temperature and steps. e.g. 0 2000 100.')
       temp_range = map(float, ui.split())
       arguments.update(temp_range=temp_range)
     
@@ -132,8 +150,8 @@ through ABINIT option 'ieig2rf 4'
     # Get the q-points weights
     wtq = list()
     for ii in N.arange(nqpt):
-      ui = get_user('Enter the weight of the %s q-point' %ii)
-      wtq.append(float(ui.split()[0]))
+       ui = get_user('Enter the weight of the %s q-point' %ii)
+       wtq.append(float(ui.split()[0]))
     arguments.update(wtq=wtq)
     
     # Get the path of the DDB files from user
@@ -178,7 +196,7 @@ through ABINIT option 'ieig2rf 4'
         arguments.update(EIGI2D_fnames=EIGI2D_fnames)
     
     # Get the path of the FAN files from user if dynamical calculation
-    if (calc_type == 2 or calc_type == 3):
+    if (calc_type == 2 or calc_type >= 3):
       fnames = []
       for ii in N.arange(nqpt):
         ui = get_user('Enter the name of the %s GKK or FAN file' %ii)
