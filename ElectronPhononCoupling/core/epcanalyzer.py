@@ -551,8 +551,8 @@ class EpcAnalyzer(object):
         """
         Compute the zp frequency-dependent self-energy from one q-point.
     
-        The self-energy is evaluated on a frequency mesh 'omegase' that is shifted by the bare energies,
-        such that, what is retured is
+        The self-energy is evaluated on a frequency mesh 'omegase'
+        that is shifted by the bare energies, such that, what is retured is
     
             Simga'_kn(omega) = Sigma_kn(omega + E^0_kn)
     
@@ -563,8 +563,8 @@ class EpcAnalyzer(object):
         """
         Compute the td frequency-dependent self-energy from one q-point.
     
-        The self-energy is evaluated on a frequency mesh 'omegase' that is shifted by the bare energies,
-        such that, what is retured is
+        The self-energy is evaluated on a frequency mesh 'omegase'
+        that is shifted by the bare energies, such that, what is retured is
     
             Simga'_kn(omega,T) = Sigma_kn(omega + E^0_kn,T)
     
@@ -578,36 +578,56 @@ class EpcAnalyzer(object):
     @master_only
     def compute_zp_spectral_function(self):
         """
-        Compute the spectral function of all quasiparticles in the semi-static approximation,
-        that is, the 'upper bands' contribution to the self-energy is evaluated at the bare energy.
+        Compute the spectral function of all quasiparticles in the
+        semi-static approximation, that is, the 'upper bands' contribution
+        to the self-energy is evaluated at the bare energy.
 
-        The spectral function is evaluated on a frequency mesh 'omegase' that is shifted by the bare energies,
-        such that, what is retured is
+        The spectral function is evaluated on a frequency mesh 'omegase'
+        that is shifted by the bare energies, such that, what is retured is
 
             A'_kn(omega) = A_kn(omega + E^0_kn)
 
         """
-        self.spectral_function = np.zeros((self.nomegase, self.nkpt, self.nband), dtype=float)
-        omega = np.einsum('ij,l->ijl', np.ones((self.nkpt, self.nband)), self.omegase)
-        self.spectral_function = (1 / np.pi) * np.abs(self.self_energy.imag) / (
-                                (omega - self.self_energy.real) ** 2 + self.self_energy.imag ** 2)
+        nomegase = self.nomegase
+        nkpt = self.nkpt
+        nband = self.nband
+
+        self.spectral_function = np.zeros((nomegase, nkpt, nband), dtype=float)
+
+        omega = np.einsum('kn,l->knl', np.ones((nkpt, nband)), self.omegase)
+
+        self.spectral_function = (
+            (1 / np.pi) * np.abs(self.self_energy.imag) /
+            ((omega - self.self_energy.real) ** 2 + self.self_energy.imag ** 2)
+            )
 
     @master_only
     def compute_td_spectral_function(self):
         """
-        Compute the spectral function of all quasiparticles in the semi-static approximation,
-        that is, the 'upper bands' contribution to the self-energy is evaluated at the bare energy.
+        Compute the spectral function of all quasiparticles in the
+        semi-static approximation, that is, the 'upper bands' contribution
+        to the self-energy is evaluated at the bare energy.
 
-        The spectral function is evaluated on a frequency mesh 'omegase' that is shifted by the bare energies,
-        such that, what is retured is
+        The spectral function is evaluated on a frequency mesh 'omegase'
+        that is shifted by the bare energies, such that, what is retured is
 
             A'_kn(omega) = A_kn(omega + E^0_kn)
 
         """
-        self.spectral_function_T = np.zeros((self.nomegase, self.ntemp, self.nkpt, self.nband), dtype=float)
-        omega = np.einsum('ijt,l->ijlt', np.ones((self.nkpt, self.nband, self.ntemp)), self.omegase)
-        self.spectral_function_T = (1 / np.pi) * np.abs(self.self_energy_T.imag) / (
-                                (omega - self.self_energy_T.real) ** 2 + self.self_energy_T.imag ** 2)
+        nomegase = self.nomegase
+        nkpt = self.nkpt
+        nband = self.nband
+        ntemp = self.ntemp
+
+        self.spectral_function_T = np.zeros((nomegase, ntemp, nkpt, nband),
+                                            dtype=float)
+
+        omega = np.einsum('ijt,l->ijlt', np.ones((nkpt, nband, ntemp)), self.omegase)
+
+        self.spectral_function_T = (
+            (1 / np.pi) * np.abs(self.self_energy_T.imag) /
+            ((omega - self.self_energy_T.real) ** 2 + self.self_energy_T.imag ** 2)
+            )
 
 
     @master_only
@@ -643,11 +663,14 @@ class EpcAnalyzer(object):
         ncfile.createDimension('number_of_frequencies',len(self.omegase))
 
         # Create variable
-        data = ncfile.createVariable('reduced_coordinates_of_kpoints','d',('number_of_kpoints','cartesian'))
+        data = ncfile.createVariable('reduced_coordinates_of_kpoints','d',
+                                     ('number_of_kpoints','cartesian'))
         data[:,:] = root.variables['reduced_coordinates_of_kpoints'][:,:]
-        data = ncfile.createVariable('eigenvalues','d',('number_of_spins','number_of_kpoints','max_number_of_states'))
+        data = ncfile.createVariable('eigenvalues','d',
+                                     ('number_of_spins','number_of_kpoints','max_number_of_states'))
         data[:,:,:] = root.variables['eigenvalues'][:,:,:]
-        data = ncfile.createVariable('occupations','i',('number_of_spins','number_of_kpoints','max_number_of_states'))
+        data = ncfile.createVariable('occupations','i',
+                                     ('number_of_spins','number_of_kpoints','max_number_of_states'))
         data[:,:,:] = root.variables['occupations'][:,:,:]
         data = ncfile.createVariable('primitive_vectors','d',('cartesian','cartesian'))
         data[:,:] = root.variables['primitive_vectors'][:,:]
@@ -702,7 +725,8 @@ class EpcAnalyzer(object):
             data[0,:,:,:] = self.temperature_dependent_broadening[:,:,:].real  # FIXME number of spin
 
         self_energy = ncfile.createVariable('self_energy','d',
-            ('number_of_spins', 'number_of_kpoints', 'max_number_of_states', 'number_of_frequencies', 'cplex'))
+            ('number_of_spins', 'number_of_kpoints', 'max_number_of_states',
+             'number_of_frequencies', 'cplex'))
 
         if self.self_energy is not None:
             self_energy[0,:,:,:,0] = self.self_energy[:,:,:].real  # FIXME number of spin
@@ -712,12 +736,13 @@ class EpcAnalyzer(object):
             ('number_of_spins', 'number_of_kpoints', 'max_number_of_states',
              'number_of_frequencies', 'number_of_temperature', 'cplex'))
 
-        if self.self_energy is not None:
+        if self.self_energy_T is not None:
             self_energy_T[0,:,:,:,:,0] = self.self_energy_T[:,:,:,:].real  # FIXME number of spin
             self_energy_T[0,:,:,:,:,1] = self.self_energy_T[:,:,:,:].imag  # FIXME number of spin
 
         spectral_function = ncfile.createVariable('spectral_function','d',
-            ('number_of_spins', 'number_of_kpoints', 'max_number_of_states', 'number_of_frequencies'))
+            ('number_of_spins', 'number_of_kpoints', 'max_number_of_states',
+             'number_of_frequencies'))
 
         if self.spectral_function is not None:
             spectral_function[0,:,:,:] = self.spectral_function[:,:,:]  # FIXME number of spin
@@ -734,11 +759,13 @@ class EpcAnalyzer(object):
         if self.zero_point_renormalization_modes is not None:
             zpr_modes[:,0,:,:] = self.zero_point_renormalization_modes[:,:,:]
 
-        data = ncfile.createVariable('reduced_coordinates_of_qpoints','d', ('number_of_qpoints', 'cartesian'))
+        data = ncfile.createVariable('reduced_coordinates_of_qpoints','d',
+                                     ('number_of_qpoints', 'cartesian'))
         if self.qred is not None:
             data[...] = self.qred[...]
 
-        data = ncfile.createVariable('phonon_mode_frequencies','d', ('number_of_qpoints', 'number_of_modes'))
+        data = ncfile.createVariable('phonon_mode_frequencies','d',
+                                     ('number_of_qpoints', 'number_of_modes'))
         if self.omega is not None:
             data[...] = self.omega[...]
 
