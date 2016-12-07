@@ -24,7 +24,6 @@ class DdbFile(EpcFile):
     gprimd = np.identity(3)
     omega = None
     asr = True
-    nkpt = None
     
     def __init__(self, *args, **kwargs):
         self.asr = kwargs.pop('asr', True)
@@ -127,8 +126,7 @@ class DdbFile(EpcFile):
         for ii in np.arange(self.natom):
           jj = self.typat[ii]
           amu[ii] = self.amu[jj-1]
-
-        self.gprimd = np.linalg.inv(np.matrix(self.rprim*self.acell))
+    
         # Transform from 2nd-order matrix (non-cartesian coordinates, 
         # masses not included, asr not included ) from self to
         # dynamical matrix, in cartesian coordinates, asr not imposed.
@@ -183,8 +181,7 @@ class DdbFile(EpcFile):
         # Frequencies
         self.omega = np.sqrt(eigval)
         self.eigvect = eigvect
-   
- 
+    
         return self.omega, self.eigvect
     
     def get_reduced_displ_squared(self):
@@ -283,102 +280,99 @@ class DdbFile(EpcFile):
     # This old function reads the DDB from the ascii file.
     # It is left here for legacy.
     #
-    def read_ddb(self, fname=None):
-      """Open the DDB file and read it."""
-      fname = fname if fname else self.fname
-      print('Open DDB file', fname)
-      if not (os.path.isfile(fname)):
-        raise Exception('The file "%s" does not exists!' %fname)
-      with open(fname, 'r') as DDB:
-        Flag = 0
-        Flag2 = False
-        Flag3 = False
-        ikpt = 0
-        for line in DDB:
-          if line.find('natom') > -1:
-            self.natom = np.int(line.split()[1])
-          if line.find('nkpt') > -1:
-            self.nkpt = np.int(line.split()[1])
-            self.kpt  = zeros((self.nkpt,3))
-          if line.find('ntypat') > -1:
-            self.ntypat = np.int(line.split()[1])
-          if line.find('nband') > -1:
-            self.nband = np.int(line.split()[1])
-          if line.find('acell') > -1:
-            line = line.replace('D','E')
-            tmp = line.split()
-            self.acell = [np.float(tmp[1]),np.float(tmp[2]),np.float(tmp[3])]
-          if Flag2:
-            line = line.replace('D','E')
-            for ii in np.arange(3,self.ntypat):
-              self.amu[ii] = np.float(line.split()[ii-3])
-              Flag2 = False
-          if line.find('amu') > -1:
-            line = line.replace('D','E')
-            self.amu = zeros((self.ntypat))
-            if self.ntypat > 3:
-              for ii in np.arange(3):
-                self.amu[ii] = np.float(line.split()[ii+1])
-                Flag2 = True 
-            else:
-              for ii in np.arange(self.ntypat):
-                self.amu[ii] = np.float(line.split()[ii+1])
-          if line.find(' kpt ') > -1:
-            line = line.replace('D','E')
-            tmp = line.split()
-            self.kpt[0,0:3] = [float(tmp[1]),float(tmp[2]),float(tmp[3])]
-            ikpt = 1
-            continue
-          if ikpt < self.nkpt and ikpt > 0:
-            line = line.replace('D','E')
-            tmp = line.split()
-            self.kpt[ikpt,0:3] = [float(tmp[0]),float(tmp[1]),float(tmp[2])]  
-            ikpt += 1
-            continue
-          if Flag == 2:
-            line = line.replace('D','E')
-            tmp = line.split()
-            self.rprim[2,0:3] = [float(tmp[0]),float(tmp[1]),float(tmp[2])]
-            Flag = 0
-          if Flag == 1:
-            line = line.replace('D','E')
-            tmp = line.split()
-            self.rprim[1,0:3] = [float(tmp[0]),float(tmp[1]),float(tmp[2])]
-            Flag = 2
-          if line.find('rprim') > -1:
-            line = line.replace('D','E')
-            tmp = line.split()
-            self.rprim[0,0:3] = [float(tmp[1]),float(tmp[2]),float(tmp[3])]
-            Flag = 1
-          if Flag3:
-            line = line.replace('D','E')
-            for ii in np.arange(12,self.natom): 
-              self.typat[ii] = np.float(line.split()[ii-12]) 
-            Flag3 = False 
-          if line.find(' typat') > -1:
-            self.typat = zeros((self.natom))
-            if self.natom > 12:
-              for ii in np.arange(12):
-                self.typat[ii] = np.float(line.split()[ii+1])
-                Flag3 = True
-            else:
-              for ii in np.arange(self.natom):
-                self.typat[ii] = np.float(line.split()[ii+1])
-          # Read the actual d2E/dRdR matrix
-          if Flag == 3:
-            line = line.replace('D','E')
-            tmp = line.split()
-            if not tmp:
-              break
-            self.E2D[int(tmp[0])-1,int(tmp[1])-1,int(tmp[2])-1,int(tmp[3])-1] = \
-              complex(float(tmp[4]),float(tmp[5]))
-          # Read the current Q-point
-          if line.find('qpt') > -1:
-            line = line.replace('D','E')
-            tmp = line.split()
-            self.qred = [np.float(tmp[1]),np.float(tmp[2]),np.float(tmp[3])]
-            Flag = 3
-            self.E2D = zeros((3,self.natom,3,self.natom),dtype=complex)
+    #def DDB_file_open(self, filefullpath):
+    #  """Open the DDB file and read it."""
+    #  if not (os.path.isfile(filefullpath)):
+    #    raise Exception('The file "%s" does not exists!' %filefullpath)
+    #  with open(filefullpath,'r') as DDB:
+    #    Flag = 0
+    #    Flag2 = False
+    #    Flag3 = False
+    #    ikpt = 0
+    #    for line in DDB:
+    #      if line.find('natom') > -1:
+    #        self.natom = np.int(line.split()[1])
+    #      if line.find('nkpt') > -1:
+    #        self.nkpt = np.int(line.split()[1])
+    #        self.kpt  = zeros((self.nkpt,3))
+    #      if line.find('ntypat') > -1:
+    #        self.ntypat = np.int(line.split()[1])
+    #      if line.find('nband') > -1:
+    #        self.nband = np.int(line.split()[1])
+    #      if line.find('acell') > -1:
+    #        line = line.replace('D','E')
+    #        tmp = line.split()
+    #        self.acell = [np.float(tmp[1]),np.float(tmp[2]),np.float(tmp[3])]
+    #      if Flag2:
+    #        line = line.replace('D','E')
+    #        for ii in np.arange(3,self.ntypat):
+    #          self.amu[ii] = np.float(line.split()[ii-3])
+    #          Flag2 = False
+    #      if line.find('amu') > -1:
+    #        line = line.replace('D','E')
+    #        self.amu = zeros((self.ntypat))
+    #        if self.ntypat > 3:
+    #          for ii in np.arange(3):
+    #            self.amu[ii] = np.float(line.split()[ii+1])
+    #            Flag2 = True 
+    #        else:
+    #          for ii in np.arange(self.ntypat):
+    #            self.amu[ii] = np.float(line.split()[ii+1])
+    #      if line.find(' kpt ') > -1:
+    #        line = line.replace('D','E')
+    #        tmp = line.split()
+    #        self.kpt[0,0:3] = [float(tmp[1]),float(tmp[2]),float(tmp[3])]
+    #        ikpt = 1
+    #        continue
+    #      if ikpt < self.nkpt and ikpt > 0:
+    #        line = line.replace('D','E')
+    #        tmp = line.split()
+    #        self.kpt[ikpt,0:3] = [float(tmp[0]),float(tmp[1]),float(tmp[2])]  
+    #        ikpt += 1
+    #        continue
+    #      if Flag == 2:
+    #        line = line.replace('D','E')
+    #        tmp = line.split()
+    #        self.rprim[2,0:3] = [float(tmp[0]),float(tmp[1]),float(tmp[2])]
+    #        Flag = 0
+    #      if Flag == 1:
+    #        line = line.replace('D','E')
+    #        tmp = line.split()
+    #        self.rprim[1,0:3] = [float(tmp[0]),float(tmp[1]),float(tmp[2])]
+    #        Flag = 2
+    #      if line.find('rprim') > -1:
+    #        line = line.replace('D','E')
+    #        tmp = line.split()
+    #        self.rprim[0,0:3] = [float(tmp[1]),float(tmp[2]),float(tmp[3])]
+    #        Flag = 1
+    #      if Flag3:
+    #        line = line.replace('D','E')
+    #        for ii in np.arange(12,self.natom): 
+    #          self.typat[ii] = np.float(line.split()[ii-12]) 
+    #        Flag3 = False 
+    #      if line.find(' typat') > -1:
+    #        self.typat = zeros((self.natom))
+    #        if self.natom > 12:
+    #          for ii in np.arange(12):
+    #            self.typat[ii] = np.float(line.split()[ii+1])
+    #            Flag3 = True
+    #        else:
+    #          for ii in np.arange(self.natom):
+    #            self.typat[ii] = np.float(line.split()[ii+1])
+    #      # Read the actual d2E/dRdR matrix
+    #      if Flag == 3:
+    #        line = line.replace('D','E')
+    #        tmp = line.split()
+    #        if not tmp:
+    #          break
+    #        self.E2D[int(tmp[0])-1,int(tmp[1])-1,int(tmp[2])-1,int(tmp[3])-1] = \
+    #          complex(float(tmp[4]),float(tmp[5]))
+    #      # Read the current Q-point
+    #      if line.find('qpt') > -1:
+    #        line = line.replace('D','E')
+    #        tmp = line.split()
+    #        self.iqpt = [np.float(tmp[1]),np.float(tmp[2]),np.float(tmp[3])]
+    #        Flag = 3
+    #        self.E2D = zeros((3,self.natom,3,self.natom),dtype=complex)
 
-      # seems the E2D should be permuted to (self.natom,3,self.natom,3)
-      self.E2D = np.transpose(self.E2D, (1,0,3,2))
+

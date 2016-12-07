@@ -26,7 +26,6 @@ def compute_epc(
         EIGI2D_fnames = list(),
         FAN_fnames = list(),
         GKK_fnames = list(),
-        wtkpt = list(),
         verbose=False,
         **kwargs):
     """
@@ -119,7 +118,6 @@ def compute_epc(
                        smearing=smearing_Ha,
                        output=output,
                        verbose=verbose,
-                       wtkpt=wtkpt,
                        **kwargs)
 
     # Compute renormalization
@@ -145,12 +143,8 @@ def compute_epc(
             epc.compute_static_control_zp_renormalization()
 
     elif calc_type == 4:
-        if temperature:
-            epc.compute_td_self_energy()
-            epc.compute_td_spectral_function()
-        else:
-            epc.compute_zp_self_energy()
-            epc.compute_zp_spectral_function()
+        epc.compute_self_energy()
+        epc.compute_spectral_function()
 
     else:
         raise Exception('Calculation type must be 1, 2, 3 or 4')
