@@ -634,7 +634,7 @@ class QptAnalyzer(object):
       
         # nmode, nkpt, nband
         fan_stern, ddw_stern = self.get_fan_ddw_sternheimer()
-        fan_stern = einsum('oij,m->omij', fan_stern, ones(nomegase))
+        fan_stern = einsum('okn,l->olkn', fan_stern, ones(nomegase))
       
         # Sum Sternheimer (upper) contribution
         fan_term = np.sum(fan_stern, axis=0)
@@ -652,12 +652,12 @@ class QptAnalyzer(object):
         occ = self.get_occ_nospin()
     
         # nkpt, nband, nband
-        delta_E_ddw = (einsum('ij,k->ijk', self.eig0.EIG[0,:,:].real, ones(nband))
-                     - einsum('ij,k->ikj', self.eig0.EIG[0,:,:].real, ones(nband))
-                     - einsum('ij,k->ijk', ones((nkpt,nband)), (2*occ-1)) * self.smearing * 1j)
+        delta_E_ddw = (einsum('kn,m->knm', self.eig0.EIG[0,:,:].real, ones(nband))
+                     - einsum('kn,m->kmn', self.eig0.EIG[0,:,:].real, ones(nband))
+                     - einsum('kn,m->knm', ones((nkpt,nband)), (2*occ-1)) * self.smearing * 1j)
     
         # nkpt, nband
-        ddw_add = einsum('ijk,ijk->ij', ddw_tmp, 1.0 / delta_E_ddw)
+        ddw_add = einsum('knm,knm->kn', ddw_tmp, 1.0 / delta_E_ddw)
     
         # nband
         num1 = 1.0 - occ
@@ -670,36 +670,36 @@ class QptAnalyzer(object):
             # nkpt, nband
             # delta_E[ikpt,jband] = E[ikpt,jband] - E[ikpt,kband] - (2f[kband] -1) * eta * 1j
             delta_E = (self.eig0.EIG[0,:,:].real
-                     - einsum('i,j->ij', self.eigq.EIG[0,:,kband].real, ones(nband))
+                     - einsum('k,n->kn', self.eigq.EIG[0,:,kband].real, ones(nband))
                      - ones((nkpt,nband)) * (2*occ[kband]-1) * self.smearing * 1j)
     
             # nkpt, nband, nomegase
             # delta_E_omega[ikpt,jband,lomega] = omega[lomega] + E[ikpt,jband] - E[ikpt,kband] - (2f[kband] -1) * eta * 1j
-            delta_E_omega = (einsum('ij,l->ijl', delta_E, ones(nomegase))
-                           + einsum('ij,l->ijl', ones((nkpt,nband)), self.omegase))
+            delta_E_omega = (einsum('kn,l->knl', delta_E, ones(nomegase))
+                           + einsum('kn,l->knl', ones((nkpt,nband)), self.omegase))
     
             # nkpt, nband, nomegase, nmode
-            deno1 = (einsum('ijl,m->ijlm', delta_E_omega, ones(3*natom))
-                   - einsum('ijl,m->ijlm', ones((nkpt,nband,nomegase)), omega))
+            deno1 = (einsum('knl,o->knlo', delta_E_omega, ones(3*natom))
+                   - einsum('knl,o->knlo', ones((nkpt,nband,nomegase)), omega))
     
             # nmode, nkpt, nband, nomegase
-            div1 = num1[kband] * einsum('ijlm->mijl', 1.0 / deno1)
+            div1 = num1[kband] * einsum('knlo->oknl', 1.0 / deno1)
     
             del deno1
     
             # nkpt, nband, nomegase, nmode
-            deno2 = (einsum('ijl,m->ijlm', delta_E_omega, ones(3*natom))
-                   + einsum('ijl,m->ijlm', ones((nkpt,nband,nomegase)), omega))
+            deno2 = (einsum('knl,o->knlo', delta_E_omega, ones(3*natom))
+                   + einsum('knl,o->knlo', ones((nkpt,nband,nomegase)), omega))
     
             del delta_E_omega
     
             # nmode, nkpt, nband, nomegase
-            div2 = occ[kband] * einsum('ijlm->mijl', 1.0 / deno2)
+            div2 = occ[kband] * einsum('knlo->oknl', 1.0 / deno2)
     
             del deno2
     
             # nomegase, nkpt, nband
-            fan_add += einsum('ijm,mijl->lij', fan_num[:,:,kband,:], div1 + div2)
+            fan_add += einsum('kno,oknl->lkn', fan_num[:,:,kband,:], div1 + div2)
     
             del div1, div2
       
@@ -707,12 +707,12 @@ class QptAnalyzer(object):
         # Correction from active space 
         fan_term += fan_add
         ddw_term += ddw_add
-        ddw_term = einsum('ij,m->mij', ddw_term, ones(nomegase))
+        ddw_term = einsum('kn,l->lkn', ddw_term, ones(nomegase))
     
         self.sigma = (fan_term - ddw_term) * self.wtq
     
         self.sigma = self.eig0.make_average(self.sigma)
-        self.sigma = einsum('mij->ijm', self.sigma)
+        self.sigma = einsum('lkn->knl', self.sigma)
       
         return self.sigma
 

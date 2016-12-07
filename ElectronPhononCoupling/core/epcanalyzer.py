@@ -12,7 +12,7 @@ from .util import create_directory, formatted_array_lines
 
 from .qptanalyzer import QptAnalyzer
 
-from .mpi import comm, size, rank, master_only, mpi_watch, i_am_master
+from .mpi import MPI, comm, size, rank, master_only, mpi_watch, i_am_master
 
 # =========================================================================== #
 
@@ -198,8 +198,8 @@ class EpcAnalyzer(object):
         Find the Fermi level by gathering information from all workers
         and broadcast the result.
         """
-        all_max_val = gather_qpt_function('get_max_val')
-        all_min_cond = gather_qpt_function('get_min_cond')
+        all_max_val = self.gather_qpt_function('get_max_val')
+        all_min_cond = self.gather_qpt_function('get_min_cond')
         if i_am_master:
             max_val = np.max(all_max_val)
             min_cond = np.min(all_min_cond)
