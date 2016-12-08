@@ -18,5 +18,9 @@ dist
 dist/*/
 dist/*.egg
 
-# Files produced by the tests
+# Files produced by the tests and the examples
 ElectronPhononCoupling/data/inputs-for-tests/output
+
+Examples/Calculations/*/odat*
+Examples/Calculations/*/*.out*
+Examples/Out/*

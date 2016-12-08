@@ -13,17 +13,9 @@
 # - Compute electron-phonon coupling
 #
 # The electron-phonon coupling for the 3 q-points is computed
-# in datasets 7, 11 and 15. The variable ieig2rf for these dataset is set to 5.
-# This means that the EIGR2D.nc files contain only the Sternheimer
-# contributions, while the active space contribution is contained
-# in the GKK.nc files.
-#
-# You can do a purely static calculation by setting ieig2rf=1,
-# then use calc_type=1 in the post processing scripts.
-# In this case, the EIGR2D.nc files contain the full contribution
-# to the eigenvalues renormalization, and the EIGI2D.nc files will be printed.
-# It is however less flexible than ieig2rf=5 and there is no advantage
-# to this approach.
+# in datasets 7, 11 and 15. The variable ieig2rf for these dataset is set to 1.
+# This means that the EIGR2D.nc files contain all the contributions to
+# the second-order derivatives of the eigenvalues.
 #
 # =========================================================================== #
 
