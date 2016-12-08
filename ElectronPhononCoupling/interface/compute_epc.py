@@ -18,7 +18,7 @@ def compute_epc(
         lifetime = False,
         smearing_eV = 0.01,
         temp_range = [0, 0, 1],
-        omega_range=[-1,1,0.5],
+        omega_range=[-0.1,0.1,0.001],
         eig0_fname = '',
         eigq_fnames = list(),
         DDB_fnames = list(),

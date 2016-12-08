@@ -34,7 +34,7 @@ def get_user_input():
         'smearing_eV' : 3.6749e-4,
         'temperature' : False,
         'temp_range' : [0, 0, 1],
-        'omega_range' : [-1, 1, 0.5],
+        'omega_range' : [-0.1, 0.1, 0.001],
         'lifetime' : False,
         'DDB_fnames' : list(),
         'eigq_fnames' : list(),
