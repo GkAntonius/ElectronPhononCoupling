@@ -581,9 +581,9 @@ class QptAnalyzer(object):
         from the EIGI2D files.
         """
     
-        nkpt = self.eigi2d.nkpt
-        nband = self.eigi2d.nband
-        natom = self.eigi2d.natom
+        nkpt = self.nkpt
+        nband = self.nband
+        natom = self.natom
     
         self.zpb = zeros((nkpt, nband), dtype=complex)
     
@@ -614,9 +614,9 @@ class QptAnalyzer(object):
         Returns: sigma[nkpt,nband,nomegase]
         """
     
-        nkpt = self.eigr2d.nkpt
-        nband = self.eigr2d.nband
-        natom = self.eigr2d.natom
+        nkpt = self.nkpt
+        nband = self.nband
+        natom = self.natom
     
         nomegase = self.nomegase
       
@@ -728,9 +728,9 @@ class QptAnalyzer(object):
         Returns: sigma[nkpt,nband,nomegase,ntemp]
         """
     
-        nkpt = self.eigr2d.nkpt
-        nband = self.eigr2d.nband
-        natom = self.eigr2d.natom
+        nkpt = self.nkpt
+        nband = self.nband
+        natom = self.natom
     
         nmode = self.nmode
 
@@ -764,19 +764,13 @@ class QptAnalyzer(object):
         # nomegase, ntemp, nkpt, nband
         fan_term = einsum('lkn,t->ltkn', fan_term, ones(ntemp))     
 
-        # nkpt, nband
-        ddw_term = np.sum(ddw_stern, axis=0)
-
-        # nkpt, nband, ntemp
-        ddw_term = einsum('kn,t->knt', ddw_term, ones(ntemp))
+        # nkpt, nband, nmode
+        ddw_term = einsum('okn->kno', ddw_stern)
       
         # ==== Active space contribution ==== #
       
         # nkpt, nband, nband, nmode
         fan_num, ddw_num = self.get_fan_ddw_active()
-    
-        # nkpt, nband, nband
-        ddw_tmp = np.sum(ddw_num, axis=3)
     
         # nspin, nkpt, nband, ntemp
         occ = self.eigq.get_fermi_function(self.mu, self.temperatures)
@@ -789,8 +783,8 @@ class QptAnalyzer(object):
                      - einsum('kn,m->kmn', self.eig0.EIG[0,:,:].real, ones(nband))
                      - einsum('kn,m->knm', ones((nkpt,nband)), (2*occ0-1)) * self.smearing * 1j)
 
-        # nkpt, nband
-        ddw_add = einsum('knm,knm->kn', ddw_tmp, 1.0 / delta_E_ddw)
+        # nkpt, nband, nmode
+        ddw_add = einsum('knmo,knm->kno', ddw_num, 1.0 / delta_E_ddw)
     
         # nkpt, nband, nmode, ntemp
         # n + 1 - f
@@ -816,7 +810,7 @@ class QptAnalyzer(object):
             # nkpt, nband, nomegase
             # delta_E_omega[ikpt,jband,lomega] = omega[lomega] + E[ikpt,jband] - E[ikpt,kband] - (2f[kband] -1) * eta * 1j
             delta_E_omega = (einsum('kn,l->knl', delta_E, ones(nomegase))
-                           + einsum('kn,l->knl', ones((nkpt,nband)), omegase))
+                           + einsum('kn,l->knl', ones((nkpt,nband)), self.omegase))
     
             # nkpt, nband, nomegase, nmode
             deno1 = (einsum('knl,o->knlo', delta_E_omega, ones(3*natom))
@@ -852,7 +846,7 @@ class QptAnalyzer(object):
         ddw_term += ddw_add
 
         # ntemp, nkpt, nband
-        ddw_term = einsum('kn,t->tkn', ddw_term, 2 * bose + 1)
+        ddw_term = einsum('kno,ot->tkn', ddw_term, 2 * bose + 1)
 
         # nomegase, ntemp, nkpt, nband
         ddw_term = einsum('tkn,l->ltkn', ddw_term, ones(nomegase))
@@ -903,9 +897,9 @@ class QptAnalyzer(object):
         with the transitions split between active and sternheimer.
         """
     
-        nkpt = self.eigr2d.nkpt
-        nband = self.eigr2d.nband
-        natom = self.eigr2d.natom
+        nkpt = self.nkpt
+        nband = self.nband
+        natom = self.natom
         ntemp = self.ntemp
     
         # These indicies be swapped at the end
@@ -978,9 +972,9 @@ class QptAnalyzer(object):
         renormalization in a dynamical scheme.
         """
     
-        nkpt = self.eigr2d.nkpt
-        nband = self.eigr2d.nband
-        natom = self.eigr2d.natom
+        nkpt = self.nkpt
+        nband = self.nband
+        natom = self.natom
         ntemp = self.ntemp
     
         self.tdr =  zeros((ntemp, nkpt, nband), dtype=complex)
@@ -1069,9 +1063,9 @@ class QptAnalyzer(object):
         in a static scheme from the EIGI2D files.
         """
     
-        nkpt = self.eigi2d.nkpt
-        nband = self.eigi2d.nband
-        natom = self.eigi2d.natom
+        nkpt = self.nkpt
+        nband = self.nband
+        natom = self.natom
         ntemp = self.ntemp
           
         # These indicies be swapped at the end
@@ -1104,9 +1098,9 @@ class QptAnalyzer(object):
         Retain the mode decomposition of the zpr.
         """
     
-        nkpt = self.eigr2d.nkpt
-        nband = self.eigr2d.nband
-        natom = self.eigr2d.natom
+        nkpt = self.nkpt
+        nband = self.nband
+        natom = self.natom
         nmode = 3 * natom
       
         self.zpr = zeros((nmode, nkpt, nband), dtype=complex)
