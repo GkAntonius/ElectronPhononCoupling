@@ -40,6 +40,10 @@ recursive-include ElectronPhononCoupling *.py
 recursive-include ElectronPhononCoupling/scripts *
 recursive-include ElectronPhononCoupling/data *
 prune ElectronPhononCoupling/data/inputs-for-tests/output
+graft Examples
+exclude Examples/Calculations/*/odat*
+exclude Examples/Calculations/*/*.out*
+exclude Examples/Out/*
 """
     with open('MANIFEST.in', 'write') as f:
         f.write(content)
