@@ -1,2 +1,3 @@
 
-from ddb_converter import *
+from .ddb_converter import *
+from .reduce_kpoints import *

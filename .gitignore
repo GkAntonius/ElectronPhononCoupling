@@ -23,4 +23,6 @@ ElectronPhononCoupling/data/inputs-for-tests/output
 
 Examples/Calculations/*/odat*
 Examples/Calculations/*/*.out*
+Examples/Calculations/*/*log*
+Examples/Calculations/*/*fort*
 Examples/Out/*

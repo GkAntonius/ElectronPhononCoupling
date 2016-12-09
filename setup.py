@@ -43,6 +43,8 @@ prune ElectronPhononCoupling/data/inputs-for-tests/output
 graft Examples
 exclude Examples/Calculations/*/odat*
 exclude Examples/Calculations/*/*.out*
+exclude Examples/Calculations/*/*.log*
+exclude Examples/Calculations/*/*fort*
 exclude Examples/Out/*
 """
     with open('MANIFEST.in', 'write') as f:

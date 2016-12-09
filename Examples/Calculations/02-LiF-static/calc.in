@@ -207,6 +207,7 @@
  nsym7      1
 
  # Files
+ getden7    1
  getwfk7    3
  getwfq7    -1
  get1den7   -2
@@ -312,6 +313,7 @@
  nsym11     1
 
  # Files
+ getden11   1
  getwfk11   3
  getwfq11   -1
  get1den11  -2
@@ -417,6 +419,7 @@
  nsym15     1
 
  # Files
+ getden15   1
  getwfk15   3
  getwfq15   -1
  get1den15  -2
@@ -451,3 +454,4 @@
  enunit     2
  diemac     9.0
  npfft      1
+ istwfk     *1
