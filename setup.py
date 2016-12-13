@@ -78,6 +78,7 @@ setup_args = dict(
       description      = description,
       long_description = long_description,
       author           = author,
+      author_email     = author_email,
       url              = url,
       license          = license,
       packages         = find_packages(),
