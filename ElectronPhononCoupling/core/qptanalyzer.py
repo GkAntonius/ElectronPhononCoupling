@@ -32,7 +32,7 @@ class QptAnalyzer(object):
                  omegase=None,
                  asr=True,
                  mu=None,
-                                ):
+                 ):
 
         # Files
         self.ddb = DdbFile(DDB_fname, read=False, asr=asr)

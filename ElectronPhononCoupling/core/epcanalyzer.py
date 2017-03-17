@@ -514,7 +514,9 @@ class EpcAnalyzer(object):
 
     def compute_dynamical_td_broadening(self):
         self.check_temperatures()
-        warnings.warn("Dynamical lifetime at finite temperature is not yet implemented...proceed with static lifetime")
+        warnings.warn('Dynamical lifetime at finite temperature '
+                      'is not yet implemented...'
+                      'proceed with static lifetime')
         return self.compute_static_td_broadening()
 
     def compute_dynamical_zp_broadening(self):
@@ -526,7 +528,9 @@ class EpcAnalyzer(object):
 
     def compute_static_control_td_broadening(self):
         self.check_temperatures()
-        warnings.warn("Static lifetime at finite temperature with control over smearing is not yet implemented...proceed with static lifetime")
+        warnings.warn('Static lifetime at finite temperature '
+                      'with control over smearing is not yet implemented...'
+                      'proceed with static lifetime')
         return self.compute_static_td_broadening()
 
     def compute_static_control_zp_broadening(self):
