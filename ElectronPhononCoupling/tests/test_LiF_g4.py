@@ -1,11 +1,10 @@
 from __future__ import print_function
 from os.path import join as pjoin
-from copy import copy
-
-from ..data import LiF_g4 as test
-from ..interface import compute_epc
 
 from . import EPCTest
+from ..interface import compute_epc
+
+from ..data.LiF_g4 import nqpt, wtq, fnames, outputdir
 
 class Test_LiF_g4(EPCTest):
 
@@ -14,17 +13,17 @@ class Test_LiF_g4(EPCTest):
         smearing_eV=0.01,
         temp_range=[0,600,300],
         omega_range=[-.1,.1,.001],
-        nqpt=test.nqpt,
-        wtq=test.wtq,
-        **test.fnames)
+        nqpt=nqpt,
+        wtq=wtq,
+        **fnames)
 
-    def test_t21(self):
-        """Dynamical ZP Ren"""
+    def test_zpr_dyn(self):
+        """Dynamical zero-point renormalization"""
 
-        basename = 't21'
+        basename = 'zpr_dyn'
         root = pjoin(self.tmpdir, basename)
         out = root + '_EP.nc'
-        ref = pjoin(test.outputdir, basename + '_EP.nc')
+        ref = pjoin(outputdir, basename + '_EP.nc')
 
         self.check_reference_exists(ref)
 
@@ -37,10 +36,10 @@ class Test_LiF_g4(EPCTest):
 
         self.AssertClose(out, ref, 'zero_point_renormalization')
 
-    def generate_t21(self, outputdir=test.outputdir):
+    def generate_zpr_dyn(self):
         """Generate epc data for this test."""
 
-        basename = 't21'
+        basename = 'zpr_dyn'
         root = pjoin(outputdir, basename)
 
         compute_epc(
@@ -50,11 +49,42 @@ class Test_LiF_g4(EPCTest):
             output=root,
             **self.common)
 
-    def generate(self, outputdir=test.outputdir):
+    def test_tdr_dyn(self):
+        """Dynamical temperature dependent renormalization"""
+
+        basename = 'tdr_dyn'
+        root = pjoin(self.tmpdir, basename)
+        out = root + '_EP.nc'
+        ref = pjoin(outputdir, basename + '_EP.nc')
+
+        compute_epc(
+            calc_type=2,
+            temperature=True,
+            lifetime=False,
+            output=root,
+            **self.common)
+
+        self.AssertClose(out, ref, 'temperature_dependent_renormalization')
+
+    def generate_tdr_dyn(self):
+        """Dynamical temperature dependent renormalization"""
+
+        basename = 'tdr_dyn'
+        root = pjoin(outputdir, basename)
+
+        compute_epc(
+            calc_type=2,
+            temperature=True,
+            lifetime=False,
+            output=root,
+            **self.common)
+
+    def generate(self):
         """Generate epc data for all tests."""
 
         print('Generating data in directory: {}'.format(outputdir))
 
-        self.generate_t21(outputdir)
+        self.generate_zpr_dyn()
+        self.generate_tdr_dyn()
 
 

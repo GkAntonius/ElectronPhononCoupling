@@ -30,31 +30,33 @@ def find_scripts():
 
 
 def get_long_desc():
-    with open("README.rst") as fh:
-        return fh.read()
+    with open("README.rst") as f:
+        return f.read()
 
 def write_manifest():
-    content = """\
-include *.rst
-recursive-include ElectronPhononCoupling *.py
-recursive-include ElectronPhononCoupling/scripts *
-recursive-include ElectronPhononCoupling/data *
-prune ElectronPhononCoupling/data/inputs-for-tests/output
-graft Examples
-exclude Examples/Calculations/*/odat*
-exclude Examples/Calculations/*/*.out*
-exclude Examples/Calculations/*/*.log*
-exclude Examples/Calculations/*/*fort*
-exclude Examples/Out/*
-"""
+    content = """
+    include *.rst
+    recursive-include ElectronPhononCoupling *.py
+    recursive-include ElectronPhononCoupling/scripts *
+    recursive-include ElectronPhononCoupling/data *
+    prune ElectronPhononCoupling/data/LiF_g2/epc_inputs/output
+    graft Examples
+    exclude Examples/Calculations/*/odat*
+    exclude Examples/Calculations/*/*.out*
+    exclude Examples/Calculations/*/*.log*
+    exclude Examples/Calculations/*/*fort*
+    exclude Examples/Out/*
+    """
     with open('MANIFEST.in', 'write') as f:
-        f.write(content)
+        for line in content.strip().splitlines():
+            f.write(line.strip() + '\n')
 
 
 def find_package_data(dirname):
     paths = []
     for (path, directories, filenames) in os.walk(dirname):
         for filename in filenames:
+            # We need the path relative to the main source directory.
             paths.append(os.path.join('..', path, filename))
     return paths
 
@@ -77,9 +79,8 @@ my_package_data = {'' :
   + find_package_data('ElectronPhononCoupling/data/LiF_g4')
     }
 
-# FIXME needs to be updated
 my_exclude_package_data = {
-        #'ElectronPhononCoupling.data' : ['inputs_for_tests/ouput/*'],
+    'ElectronPhononCoupling.data' : ['LiF_g2/epc_inputs/output/*'],
     }
 
 
