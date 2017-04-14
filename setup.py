@@ -51,6 +51,13 @@ exclude Examples/Out/*
         f.write(content)
 
 
+def find_package_data(dirname):
+    paths = []
+    for (path, directories, filenames) in os.walk(dirname):
+        for filename in filenames:
+            paths.append(os.path.join('..', path, filename))
+    return paths
+
 #---------------------------------------------------------------------------
 # Setup
 #---------------------------------------------------------------------------
@@ -63,12 +70,16 @@ install_requires = [
     'netCDF4 >=1.2',
     ]
 
-my_package_data = {
-        'ElectronPhononCoupling.data' : ['data_*/*', 'inputs_for_tests/*.*', 'outputs_of_tests/*'],
+
+my_package_data = {'' :
+    find_package_data('ElectronPhononCoupling/data/Psps_for_tests')
+  + find_package_data('ElectronPhononCoupling/data/LiF_g2')
+  + find_package_data('ElectronPhononCoupling/data/LiF_g4')
     }
 
+# FIXME needs to be updated
 my_exclude_package_data = {
-        'ElectronPhononCoupling.data' : ['inputs_for_tests/ouput/*'],
+        #'ElectronPhononCoupling.data' : ['inputs_for_tests/ouput/*'],
     }
 
 

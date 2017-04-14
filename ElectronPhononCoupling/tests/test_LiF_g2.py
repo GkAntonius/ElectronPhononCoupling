@@ -4,7 +4,7 @@ from copy import copy
 from . import EPCTest
 from ..data import LiF_g2 as test
 
-from .. import compute_epc
+from ..interface import compute_epc
 
 
 class Test_LiF_g2(EPCTest):

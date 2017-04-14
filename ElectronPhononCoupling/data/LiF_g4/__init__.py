@@ -4,7 +4,10 @@ Filenames of the tests
 import os
 from os.path import join as pjoin
 
+# This is a 4x4x4 q-point grid. The weights can be obtained from abinit.
 nqpt = 8
+wtq = [ 0.015625,  0.125   ,  0.0625  ,  0.09375 ,  0.375   ,  0.1875  ,
+        0.046875,  0.09375 ]
 
 dirname = os.path.dirname(__file__)
 
@@ -45,3 +48,5 @@ fnames = dict(
     EIGR2D_fnames=EIGR2D_fnames,
     GKK_fnames=GKK_fnames,
     )
+
+outputdir = pjoin(dirname, 'epc_outputs')

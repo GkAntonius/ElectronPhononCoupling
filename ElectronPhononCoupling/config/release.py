@@ -13,7 +13,7 @@ __all__ = [
     ]
 
 
-__version__ = '3.6.0'
+__version__ = '3.7.0'
 
 name = "ElectronPhononCoupling"
 
@@ -30,9 +30,10 @@ long_description = """"
 
 license = 'GPL'
 
-authors = {'SP': (u'Samuel Poncé', 'sponce at gmail.com'),
-           'GA': ('Gabriel Antonius', 'gabriel.antonius at gmail.com'),
-        }
+authors = {
+    'GA': ('Gabriel Antonius', 'gabriel.antonius at gmail.com'),
+    'SP': (u'Samuel Poncé', 'sponce at gmail.com'),
+    }
         
 author = 'The ABINIT group'
 
