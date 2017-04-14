@@ -2,27 +2,27 @@ from os.path import join as pjoin
 from copy import copy
 
 from . import EPCTest
-from ..data import LiF_nqpt, LiF_wtq, LiF_fnames, LiF_outputs
+from ..data import LiF_g2 as test
 
 from .. import compute_epc
 
 
-class AllTests(EPCTest):
+class Test_LiF_g2(EPCTest):
 
     common = dict(
         write=True,
         smearing_eV=0.01,
         temp_range=[0,600,300],
         omega_range=[-.1,.1,.001],
-        nqpt=LiF_nqpt,
-        wtq=LiF_wtq,
-        **LiF_fnames)
+        nqpt=test.nqpt,
+        wtq=test.wtq,
+        **test.fnames)
 
     def test_t11(self):
         """Static ZP Ren"""
 
         root = pjoin(self.tmpdir, 't11')
-        ref = LiF_outputs['t11']
+        ref = test.outputs['t11']
         out = root + '_EP.nc'
 
         compute_epc(
@@ -38,7 +38,7 @@ class AllTests(EPCTest):
         """Static Tdep Ren"""
 
         root = pjoin(self.tmpdir, 't12')
-        ref = LiF_outputs['t12']
+        ref = test.outputs['t12']
         out = root + '_EP.nc'
 
         compute_epc(
@@ -54,7 +54,7 @@ class AllTests(EPCTest):
         """Static ZP Brd"""
 
         root = pjoin(self.tmpdir, 't13')
-        ref = LiF_outputs['t13']
+        ref = test.outputs['t13']
         out = root + '_EP.nc'
 
         compute_epc(
@@ -70,7 +70,7 @@ class AllTests(EPCTest):
         """Static Tdep Brd"""
 
         root = pjoin(self.tmpdir, 't14')
-        ref = LiF_outputs['t14']
+        ref = test.outputs['t14']
         out = root + '_EP.nc'
 
         compute_epc(
@@ -86,7 +86,7 @@ class AllTests(EPCTest):
         """Dynamical ZP Ren"""
 
         root = pjoin(self.tmpdir, 't21')
-        ref = LiF_outputs['t21']
+        ref = test.outputs['t21']
         out = root + '_EP.nc'
 
         compute_epc(
@@ -102,7 +102,7 @@ class AllTests(EPCTest):
         """Dynamical Tdep Ren"""
 
         root = pjoin(self.tmpdir, 't22')
-        ref = LiF_outputs['t22']
+        ref = test.outputs['t22']
         out = root + '_EP.nc'
 
         compute_epc(
@@ -118,7 +118,7 @@ class AllTests(EPCTest):
         """Dynamical ZP Brd"""
 
         root = pjoin(self.tmpdir, 't23')
-        ref = LiF_outputs['t23']
+        ref = test.outputs['t23']
         out = root + '_EP.nc'
 
         compute_epc(
@@ -135,7 +135,7 @@ class AllTests(EPCTest):
     #    """Static Tdep Brd"""
 
     #    root = pjoin(self.tmpdir, 't24')
-    #    ref = LiF_outputs['t24']
+    #    ref = test.outputs['t24']
     #    out = root + '_EP.nc'
 
     #    compute_epc(
@@ -151,7 +151,7 @@ class AllTests(EPCTest):
         """Static ZP Ren"""
 
         root = pjoin(self.tmpdir, 't31')
-        ref = LiF_outputs['t31']
+        ref = test.outputs['t31']
         out = root + '_EP.nc'
 
         compute_epc(
@@ -167,7 +167,7 @@ class AllTests(EPCTest):
         """Static Tdep Ren"""
 
         root = pjoin(self.tmpdir, 't32')
-        ref = LiF_outputs['t32']
+        ref = test.outputs['t32']
         out = root + '_EP.nc'
 
         compute_epc(
@@ -183,7 +183,7 @@ class AllTests(EPCTest):
         """Static ZP Brd"""
 
         root = pjoin(self.tmpdir, 't33')
-        ref = LiF_outputs['t33']
+        ref = test.outputs['t33']
         out = root + '_EP.nc'
 
         compute_epc(
@@ -200,7 +200,7 @@ class AllTests(EPCTest):
     #    """Static Tdep Brd"""
 
     #    root = pjoin(self.tmpdir, 't34')
-    #    ref = LiF_outputs['t34']
+    #    ref = test.outputs['t34']
     #    out = root + '_EP.nc'
 
     #    compute_epc(
@@ -216,7 +216,7 @@ class AllTests(EPCTest):
         """ZP Spectral function."""
 
         root = pjoin(self.tmpdir, 't41')
-        ref = LiF_outputs['t41']
+        ref = test.outputs['t41']
         out = root + '_EP.nc'
 
         compute_epc(
@@ -233,7 +233,7 @@ class AllTests(EPCTest):
         """ZP Spectral function."""
 
         root = pjoin(self.tmpdir, 't42')
-        ref = LiF_outputs['t42']
+        ref = test.outputs['t42']
         out = root + '_EP.nc'
 
         compute_epc(
