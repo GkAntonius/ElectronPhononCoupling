@@ -3,7 +3,6 @@ from os.path import join as pjoin
 from copy import copy
 
 from . import SETest
-from ..interface import compute
 
 from ..data.LiF_g4 import nqpt, wtq, fnames, refdir
 
@@ -60,7 +59,8 @@ class Test_LiF_g4(SETest):
     def generate(self):
         """Generate epc data for all tests."""
 
-        print('Generating test reference data in directory: {}'.format(refdir))
+        print('Generating reference data for tests in directory: {}'.format(
+              self.refdir))
 
         for function in (
             self.get_zpr_dyn,

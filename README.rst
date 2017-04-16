@@ -24,17 +24,9 @@ requires
 Usage
 -----
 
-Interactive usage:
-
-    >$ electron-phonon-coupling
-
-or in parallel, e.g.:
-
-    >$ mpirun -n 4 electron-phonon-coupling
-
 As a python module:
 
-    from ElectronPhononCoupling import compute_epc
+    from ElectronPhononCoupling import compute
 
     ...
 

@@ -1,5 +1,6 @@
 
 from .epctest import *
+from .setest import *
 
 from . import generate
 

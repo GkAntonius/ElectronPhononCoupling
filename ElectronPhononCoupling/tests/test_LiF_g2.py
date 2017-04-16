@@ -4,8 +4,6 @@ from copy import copy
 from . import EPCTest, SETest
 from ..data import LiF_g2 as test
 
-from ..interface import compute
-
 
 # FIXME
 
@@ -32,44 +30,15 @@ class Test_LiF_g2(SETest):
         rootname = 'epc.out',
         **test.fnames)
 
-    def test_zpr_stat_nosplit(self):
-        """Static Zero Point Renormalization"""
-        self.run_compare_nc(
-            function = self.get_zpr_stat_nosplit,
-            key = 'zero_point_renormalization',
-            nc_ref = test.outputs['t11'],
-            )
-
-    def test_tdr_static_nosplit(self):
-        """Static Temperature Dependent Renormalization"""
-        self.run_compare_nc(
-            function = self.get_tdr_stat_nosplit,
-            key = 'temperature_dependent_renormalization',
-            nc_ref = test.outputs['t12'],
-            )
-
-    def test_zpb_stat_nosplit(self):
-        """Static Zero Point Broadening"""
-        self.run_compare_nc(
-            function = self.get_zpb_stat_nosplit,
-            key = 'zero_point_broadening',
-            nc_ref = test.outputs['t13'],
-            )
-
-    def test_tdb_stat_nosplit(self):
-        """Static Temperature Dependent Broadening"""
-        self.run_compare_nc(
-            function = self.get_tdb_stat_nosplit,
-            key = 'temperature_dependent_broadening',
-            nc_ref = test.outputs['t14'],
-            )
+    @property
+    def refdir(self):
+        return test.refdir
 
     def test_zpr_dyn(self):
         """Dynamical ZPR"""
         self.run_compare_nc(
             function = self.get_zpr_dyn,
             key = 'zero_point_renormalization',
-            nc_ref = test.outputs['t21'],
             )
 
     def test_tdr_dyn(self):
@@ -77,7 +46,6 @@ class Test_LiF_g2(SETest):
         self.run_compare_nc(
             function = self.get_tdr_dyn,
             key = 'temperature_dependent_renormalization',
-            nc_ref = test.outputs['t22'],
             )
 
     def test_zpb_dyn(self):
@@ -85,8 +53,36 @@ class Test_LiF_g2(SETest):
         self.run_compare_nc(
             function = self.get_zpb_dyn,
             key = 'zero_point_broadening',
-            nc_ref = test.outputs['t23'],
             )
+
+    def test_zp_se(self):
+        """Zero Point Self-Energy"""
+        self.run_compare_nc(
+            function = self.get_zp_se,
+            key = 'self_energy',
+            )
+
+    def test_zp_sf(self):
+        """Zero Point Spectral Function"""
+        self.run_compare_nc(
+            function = self.get_zp_sf,
+            key = 'spectral_function',
+            )
+
+    def test_td_se(self):
+        """Temperature Dependent Self-Energy"""
+        self.run_compare_nc(
+            function = self.get_td_se,
+            key = 'self_energy_temperature_dependent',
+            )
+
+    def test_td_sf(self):
+        """Temperature Dependent Spectral Function"""
+        self.run_compare_nc(
+            function = self.get_td_sf,
+            key = 'spectral_function_temperature_dependent',
+            )
+
 
     # Not implemented
     #def test_tdb_stat(self):
@@ -94,15 +90,13 @@ class Test_LiF_g2(SETest):
     #    self.run_compare_nc(
     #        function = self.get_zpb_dyn,
     #        key = 'zero_point_broadening',
-    #        nc_ref = test.outputs['23'],
     #        )
 
     def test_zpr_stat(self):
-        """Dynamical ZP Brd"""
+        """Static ZP Ren"""
         self.run_compare_nc(
             function = self.get_zpr_stat,
             key = 'zero_point_renormalization',
-            nc_ref = test.outputs['t31'],
             )
 
     def test_tdr_stat(self):
@@ -110,7 +104,6 @@ class Test_LiF_g2(SETest):
         self.run_compare_nc(
             function = self.get_tdr_stat,
             key = 'temperature_dependent_renormalization',
-            nc_ref = test.outputs['t32'],
             )
 
     def test_zpb_stat(self):
@@ -118,7 +111,6 @@ class Test_LiF_g2(SETest):
         self.run_compare_nc(
             function = self.get_zpb_stat,
             key = 'zero_point_broadening',
-            nc_ref = test.outputs['t33'],
             )
 
     # Not implemented
@@ -127,38 +119,62 @@ class Test_LiF_g2(SETest):
     #    self.run_compare_nc(
     #        function = self.get_tdb_stat,
     #        key = 'temperature_dependent_broadening',
-    #        nc_ref = test.outputs['t34'],
+    #        nc_ref = test.outputs['t34'],  # was doing dynamical before
     #        )
 
-    def test_zp_se(self):
-        """Zero Point Self-Energy"""
+    def test_zpr_stat_nosplit(self):
+        """Static Zero Point Renormalization"""
         self.run_compare_nc(
-            function = self.get_zp_se,
-            key = 'self_energy',
-            nc_ref = test.outputs['t41'],
+            function = self.get_zpr_stat_nosplit,
+            key = 'zero_point_renormalization',
             )
 
-    def test_zp_sf(self):
-        """Zero Point Spectral Function"""
+    def test_tdr_static_nosplit(self):
+        """Static Temperature Dependent Renormalization"""
         self.run_compare_nc(
-            function = self.get_zp_sf,
-            key = 'spectral_function',
-            nc_ref = test.outputs['t41'],
+            function = self.get_tdr_stat_nosplit,
+            key = 'temperature_dependent_renormalization',
             )
 
-    def test_td_se(self):
-        """Temperature Dependent Self-Energy"""
+    def test_zpb_stat_nosplit(self):
+        """Static Zero Point Broadening"""
         self.run_compare_nc(
-            function = self.get_td_se,
-            key = 'self_energy_temperature_dependent',
-            nc_ref = test.outputs['t42'],
+            function = self.get_zpb_stat_nosplit,
+            key = 'zero_point_broadening',
             )
 
-    def test_td_sf(self):
-        """Temperature Dependent Spectral Function"""
+    def test_tdb_stat_nosplit(self):
+        """Static Temperature Dependent Broadening"""
         self.run_compare_nc(
-            function = self.get_td_sf,
-            key = 'spectral_function_temperature_dependent',
-            nc_ref = test.outputs['t42'],
+            function = self.get_tdb_stat_nosplit,
+            key = 'temperature_dependent_broadening',
             )
+
+    # All
+    def generate(self):
+        """Generate epc data for all tests."""
+
+        print('Generating reference data for tests in directory: {}'.format(
+              self.refdir))
+
+        for function in (
+            self.get_zpr_dyn,
+            self.get_tdr_dyn,
+            self.get_zpb_dyn,
+            #self.get_tdb_dyn,
+            self.get_zp_se,
+            self.get_zp_sf,
+            self.get_td_se,
+            self.get_td_sf,
+            self.get_zpr_stat,
+            self.get_tdr_stat,
+            self.get_zpb_stat,
+            #self.get_tdb_stat,
+            self.get_zpr_stat_nosplit,
+            self.get_tdr_stat_nosplit,
+            self.get_zpb_stat_nosplit,
+            self.get_tdb_stat_nosplit,
+            ):
+            self.generate_ref(function)
+
 

@@ -21,14 +21,6 @@ with open(release_file) as f:
 # Find scripts
 #---------------------------------------------------------------------------
 
-def find_scripts():
-    """Find the scripts."""
-    scripts = []
-    pyfiles = glob(os.path.join('ElectronPhononCoupling', 'scripts', "*"))
-    scripts.extend(pyfiles)
-    return scripts
-
-
 def get_long_desc():
     with open("README.rst") as f:
         return f.read()
@@ -94,7 +86,6 @@ setup_args = dict(
       url              = url,
       license          = license,
       packages         = find_packages(),
-      scripts          = find_scripts(),
       package_data     = my_package_data,
       exclude_package_data = my_exclude_package_data,
       install_requires = install_requires,

@@ -32,7 +32,6 @@ license = 'GPL'
 
 authors = {
     'GA': ('Gabriel Antonius', 'gabriel.antonius at gmail.com'),
-    'SP': (u'Samuel Poncé', 'sponce at gmail.com'),
     }
         
 author = 'The ABINIT group'

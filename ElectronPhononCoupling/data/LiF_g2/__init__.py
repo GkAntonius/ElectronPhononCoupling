@@ -56,17 +56,5 @@ fnames = dict(
         gkk_fnames=GKK_fnames,
         )
 
-outputdir = pjoin(dirname, 'epc_outputs')
-
-outputs = dict()
-
-for t in ['t11', 't12', 't13', 't14',
-          't21', 't22', 't23', 't24',
-          't31', 't32', 't33', 't34',
-          't41', 't42',
-            ]:
-    outputs[t] = pjoin(outputdir, t + '_EP.nc')
-
-
-
+refdir = pjoin(dirname, 'epc_outputs')
 
