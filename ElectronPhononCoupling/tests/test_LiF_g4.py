@@ -1,90 +1,71 @@
 from __future__ import print_function
 from os.path import join as pjoin
+from copy import copy
 
-from . import EPCTest
-from ..interface import compute_epc
+from . import SETest
+from ..interface import compute
 
-from ..data.LiF_g4 import nqpt, wtq, fnames, outputdir
+from ..data.LiF_g4 import nqpt, wtq, fnames, refdir
 
-class Test_LiF_g4(EPCTest):
+class Test_LiF_g4(SETest):
 
     common = dict(
-        write=True,
-        smearing_eV=0.01,
-        temp_range=[0,600,300],
-        omega_range=[-.1,.1,.001],
-        nqpt=nqpt,
-        wtq=wtq,
+        temperature = False,
+        renormalization = False,
+        broadening = False,
+        self_energy = False,
+        spectral_function = False,
+        dynamical = True,
+        split_active = True,
+        double_grid = False,
+        write = True,
+        verbose = False,
+
+        nqpt = nqpt,
+        wtq = wtq,
+        smearing_eV = 0.01,
+        #temp_range = [0, 600, 50],
+        temp_range = [0, 600, 300],
+        omega_range = [-0.1, 0.1, 0.001],
+        rootname = 'epc.out',
         **fnames)
 
+    @property
+    def refdir(self):
+        return refdir
+
+    # ZPR
     def test_zpr_dyn(self):
         """Dynamical zero-point renormalization"""
+        self.run_compare_nc(
+            function = self.get_zpr_dyn,
+            key = 'zero_point_renormalization',
+            )
 
-        basename = 'zpr_dyn'
-        root = pjoin(self.tmpdir, basename)
-        out = root + '_EP.nc'
-        ref = pjoin(outputdir, basename + '_EP.nc')
-
-        self.check_reference_exists(ref)
-
-        compute_epc(
-            calc_type=2,
-            temperature=False,
-            lifetime=False,
-            output=root,
-            **self.common)
-
-        self.AssertClose(out, ref, 'zero_point_renormalization')
-
-    def generate_zpr_dyn(self):
-        """Generate epc data for this test."""
-
-        basename = 'zpr_dyn'
-        root = pjoin(outputdir, basename)
-
-        compute_epc(
-            calc_type=2,
-            temperature=False,
-            lifetime=False,
-            output=root,
-            **self.common)
+    #def generate_zpr_dyn(self):
+    #    """Generate epc data for this test."""
+    #    return self.generate_test_ref(self.get_zpr_dyn)
 
     def test_tdr_dyn(self):
         """Dynamical temperature dependent renormalization"""
+        self.run_compare_nc(
+            function = self.get_tdr_dyn,
+            key = 'temperature_dependent_renormalization',
+            )
 
-        basename = 'tdr_dyn'
-        root = pjoin(self.tmpdir, basename)
-        out = root + '_EP.nc'
-        ref = pjoin(outputdir, basename + '_EP.nc')
+    #def generate_tdr_dyn(self):
+    #    return self.generate_test_ref(self.get_tdr_dyn)
 
-        compute_epc(
-            calc_type=2,
-            temperature=True,
-            lifetime=False,
-            output=root,
-            **self.common)
-
-        self.AssertClose(out, ref, 'temperature_dependent_renormalization')
-
-    def generate_tdr_dyn(self):
-        """Dynamical temperature dependent renormalization"""
-
-        basename = 'tdr_dyn'
-        root = pjoin(outputdir, basename)
-
-        compute_epc(
-            calc_type=2,
-            temperature=True,
-            lifetime=False,
-            output=root,
-            **self.common)
-
+    # All
     def generate(self):
         """Generate epc data for all tests."""
 
-        print('Generating data in directory: {}'.format(outputdir))
+        print('Generating test reference data in directory: {}'.format(refdir))
 
-        self.generate_zpr_dyn()
-        self.generate_tdr_dyn()
+        for function in (
+            self.get_zpr_dyn,
+            self.get_tdr_dyn,
+            ):
+            self.generate_ref(function)
 
 

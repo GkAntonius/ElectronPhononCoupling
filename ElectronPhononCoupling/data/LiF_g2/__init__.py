@@ -47,13 +47,13 @@ EIG0_fname = pjoin(dirname, 'odat_calc_DS3_EIG.nc')
 
 
 fnames = dict(
-        eig0_fname=EIG0_fname,
+        eigk_fname=EIG0_fname,
         eigq_fnames=EIG_fnames,
-        DDB_fnames=DDB_fnames,
-        EIGR2D_fnames=EIGR2D_fnames,
-        EIGI2D_fnames=EIGI2D_fnames,
-        #FAN_fnames=FAN_fnames,
-        GKK_fnames=GKK_fnames,
+        ddb_fnames=DDB_fnames,
+        eigr2d_fnames=EIGR2D_fnames,
+        eigi2d_fnames=EIGI2D_fnames,
+        #fan_fnames=FAN_fnames,
+        gkk_fnames=GKK_fnames,
         )
 
 outputdir = pjoin(dirname, 'epc_outputs')

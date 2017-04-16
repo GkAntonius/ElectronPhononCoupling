@@ -16,16 +16,16 @@ __all__ = ['QptAnalyzer']
 class QptAnalyzer(object):
 
     def __init__(self,
-                 DDB_fname=None,
+                 ddb_fname=None,
                  eigq_fname=None,
-                 eig0_fname=None,
-                 EIGR2D_fname=None,
-                 EIGR2D0_fname=None,
-                 EIGI2D_fname=None,
-                 FAN_fname=None,
-                 FAN0_fname=None,
-                 GKK_fname=None,
-                 GKK0_fname=None,
+                 eigk_fname=None,
+                 eigr2d_fname=None,
+                 eigr2d0_fname=None,
+                 eigi2d_fname=None,
+                 fan_fname=None,
+                 fan0_fname=None,
+                 gkk_fname=None,
+                 gkk0_fname=None,
                  wtq=1.0,
                  smearing=0.00367,
                  temperatures=None,
@@ -35,16 +35,16 @@ class QptAnalyzer(object):
                  ):
 
         # Files
-        self.ddb = DdbFile(DDB_fname, read=False, asr=asr)
+        self.ddb = DdbFile(ddb_fname, read=False, asr=asr)
         self.eigq = EigFile(eigq_fname, read=False)
-        self.eigr2d = Eigr2dFile(EIGR2D_fname, read=False)
-        self.eigi2d = Eigr2dFile(EIGI2D_fname, read=False)
-        self.fan = FanFile(FAN_fname, read=False)
-        self.eig0 = EigFile(eig0_fname, read=False)
-        self.eigr2d0 = Eigr2dFile(EIGR2D0_fname, read=False)
-        self.fan0 = FanFile(FAN0_fname, read=False)
-        self.gkk = GkkFile(GKK_fname, read=False)
-        self.gkk0 = GkkFile(GKK0_fname, read=False)
+        self.eigr2d = Eigr2dFile(eigr2d_fname, read=False)
+        self.eigi2d = Eigr2dFile(eigi2d_fname, read=False)
+        self.fan = FanFile(fan_fname, read=False)
+        self.eig0 = EigFile(eigk_fname, read=False)
+        self.eigr2d0 = Eigr2dFile(eigr2d0_fname, read=False)
+        self.fan0 = FanFile(fan0_fname, read=False)
+        self.gkk = GkkFile(gkk_fname, read=False)
+        self.gkk0 = GkkFile(gkk0_fname, read=False)
 
         self.wtq = wtq
         self.smearing = smearing

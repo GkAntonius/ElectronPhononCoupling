@@ -1,5 +1,5 @@
 
-from .epctest import EPCTest
+from .epctest import *
 
 from . import generate
 

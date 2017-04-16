@@ -5,7 +5,7 @@ import numpy as N
 from ..config import __version__
 from ..core.mpi import comm, mpi_abort_if_exception, i_am_master
 
-from .compute_epc import compute_epc
+from .compute import compute
 
 __all__ = ['run_interactive', 'get_user_input']
 
@@ -19,7 +19,7 @@ def run_interactive():
             arguments = None
         arguments = comm.bcast(arguments, root=0)
 
-    epc = compute_epc(**arguments)
+    epc = compute(**arguments)
 
 
 

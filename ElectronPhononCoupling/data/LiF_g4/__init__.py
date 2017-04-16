@@ -42,11 +42,11 @@ GKK_fnames = [
     ]
 
 fnames = dict(
-    eig0_fname=EIG0_fname,
+    eigk_fname=EIG0_fname,
     eigq_fnames=EIG_fnames,
-    DDB_fnames=DDB_fnames,
-    EIGR2D_fnames=EIGR2D_fnames,
-    GKK_fnames=GKK_fnames,
+    ddb_fnames=DDB_fnames,
+    eigr2d_fnames=EIGR2D_fnames,
+    gkk_fnames=GKK_fnames,
     )
 
-outputdir = pjoin(dirname, 'epc_outputs')
+refdir = pjoin(dirname, 'epc_outputs')

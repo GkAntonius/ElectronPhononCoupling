@@ -1,2 +1,2 @@
-from .compute_epc import *
+from .compute import *
 from .interactive import *
