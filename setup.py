@@ -26,6 +26,7 @@ def get_long_desc():
         return f.read()
 
 def write_manifest():
+    # FIXME need a more flexible formulation for data files to exclude.
     content = """
     include *.rst
     recursive-include ElectronPhononCoupling *.py
@@ -72,7 +73,6 @@ my_package_data = {'' :
     }
 
 my_exclude_package_data = {
-    'ElectronPhononCoupling.data' : ['LiF_g2/epc_inputs/output/*'],
     }
 
 

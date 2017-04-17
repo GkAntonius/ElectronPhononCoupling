@@ -2,7 +2,8 @@
 ElectronPhononCoupling
 ======================
 
-Python module to analyze electron-phonon related quantities from ABINIT.
+ElectronPhononCoupling (EPC) is a python module
+to analyze electron-phonon related quantities computed with Abinit.
 
 
 Istallation
@@ -40,5 +41,11 @@ You can run such python script in parallel with, e.g.:
 Documentation
 -------------
  
-See the Examples and Doc directories for how to use this module.
+* For how to use this module, see the Examples directory.
+
+* For the theory pertaining the electronic self-energy
+    due to electron-phonon coupling, see [PRB 92, 085137 (2015)].
+
+* For the advanced user and developer, see the Doc directory.
+
 
