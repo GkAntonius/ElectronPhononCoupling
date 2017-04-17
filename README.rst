@@ -24,14 +24,15 @@ Usage
 
 As a python module:
 
-    from ElectronPhononCoupling import compute
+    import ElectronPhononCoupling as epc
 
-    compute(
+    epc.compute(
         renormalization=True,
         broadening=True,
         self_energy=True,
         spectral_function=True,
         temperature=True,
+        ...
 
 
 You can run such python script in parallel with, e.g.:
@@ -43,8 +44,8 @@ Documentation
  
 * For how to use this module, see the Examples directory.
 
-* For the theory pertaining the electronic self-energy
-    due to electron-phonon coupling, see [PRB 92, 085137 (2015)].
+* For the theory pertaining the electronic self-energy due to electron-phonon coupling,
+    see [PRB 92, 085137 (2015)].
 
 * For the advanced user and developer, see the Doc directory.
 

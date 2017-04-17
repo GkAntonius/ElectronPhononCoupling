@@ -29,7 +29,11 @@ In order to create a new test, follow these steps:
         to be run on this set of data.
 
 3)
+    If the new test is able to generate its reference data
+    edit the file ElectronPhononCoupling/tests/generate.py 
+    to add the generating function of the new test.
+
+4)
     Edit the setup.py file to add the data files of the new test
         among the package data.
-
 
