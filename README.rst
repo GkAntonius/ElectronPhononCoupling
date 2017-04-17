@@ -9,11 +9,11 @@ to analyze electron-phonon related quantities computed with Abinit.
 Istallation
 -----------
 
-From the module directory, issue
+Issue
 
     >$ python setup.py install
 
-requires
+Requires
 
     * numpy >= 1.8.1
     * mpi4py >= 2.0.0
@@ -22,7 +22,7 @@ requires
 Usage
 -----
 
-As a python module:
+Example:
 
     import ElectronPhononCoupling as epc
 
@@ -37,15 +37,16 @@ As a python module:
 
 You can run such python script in parallel with, e.g.:
 
-    mpirun -n 4 python my_script.py
+    mpirun -n 4 python myscript.py
 
 Documentation
 -------------
  
 * For how to use this module, see the Examples directory.
 
-* For the theory pertaining the electronic self-energy due to electron-phonon coupling,
-    see [PRB 92, 085137 (2015)].
+* For the theory pertaining the electronic self-energy
+    due to electron-phonon coupling, and temperature dependence
+    of electronic structure, see [PRB 92, 085137 (2015)].
 
 * For the advanced user and developer, see the Doc directory.
 
