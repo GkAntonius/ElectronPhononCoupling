@@ -8,12 +8,9 @@ Python module to analyze electron-phonon related quantities from ABINIT.
 Istallation
 -----------
 
-Simply issue
+From the module directory, issue
 
     >$ python setup.py install
-
-This should install the module somewhere in your $PYTHONPATH
-and the script "ElectronPhononCoupling/scripts/pp-temperature" in your $PATH
 
 requires
 
@@ -28,12 +25,20 @@ As a python module:
 
     from ElectronPhononCoupling import compute
 
-    ...
+    compute(
+        renormalization=True,
+        broadening=True,
+        self_energy=True,
+        spectral_function=True,
+        temperature=True,
 
-You can run a python script that calls the function 'compute_epc' 
-in serial or in parallel with e.g.:
+
+You can run such python script in parallel with, e.g.:
 
     mpirun -n 4 python my_script.py
 
-See the examples in the Examples directory for how to use this module.
+Documentation
+-------------
+ 
+See the Examples and Doc directories for how to use this module.
 

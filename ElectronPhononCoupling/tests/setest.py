@@ -97,11 +97,46 @@ class SETest(EPCTest):
     def get_zpb_dyn(self, dirname):
         return self.get_kwargs(
             dirname,
-            basename='tdb_stat',
+            basename='zpb_dyn',
             temperature=False,
             broadening=True,
             dynamical=True,
             )
+
+    def get_zp_se(self, dirname):
+        return self.get_kwargs(
+            dirname,
+            basename='zp_se',
+            temperature=False,
+            self_energy=True,
+            )
+
+    def get_td_se(self, dirname):
+        return self.get_kwargs(
+            dirname,
+            basename='td_se',
+            temperature=True,
+            self_energy=True,
+            )
+
+    def get_zp_sf(self, dirname):
+        return self.get_kwargs(
+            dirname,
+            basename='zp_sf',
+            temperature=False,
+            self_energy=True,
+            spectral_function=True,
+            )
+
+    def get_td_sf(self, dirname):
+        return self.get_kwargs(
+            dirname,
+            basename='td_sf',
+            temperature=True,
+            self_energy=True,
+            spectral_function=True,
+            )
+
 
     def get_zpr_stat(self, dirname):
         return self.get_kwargs(
@@ -177,38 +212,3 @@ class SETest(EPCTest):
             dynamical=False,
             split_active=False,
             )
-
-    def get_zp_se(self, dirname):
-        return self.get_kwargs(
-            dirname,
-            basename='zp_se',
-            temperature=False,
-            self_energy=True,
-            )
-
-    def get_td_se(self, dirname):
-        return self.get_kwargs(
-            dirname,
-            basename='td_se',
-            temperature=True,
-            self_energy=True,
-            )
-
-    def get_zp_sf(self, dirname):
-        return self.get_kwargs(
-            dirname,
-            basename='zp_sf',
-            temperature=False,
-            self_energy=True,
-            spectral_function=True,
-            )
-
-    def get_td_sf(self, dirname):
-        return self.get_kwargs(
-            dirname,
-            basename='td_sf',
-            temperature=True,
-            self_energy=True,
-            spectral_function=True,
-            )
-

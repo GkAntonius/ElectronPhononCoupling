@@ -42,7 +42,7 @@ eigk_fname = 'Calculations/01-LiF-dynamical/odat_calc_DS3_EIG.nc'
 epc = compute(
     renormalization=True,   # Compute the eigenvalues renormalization
     temperature = True,     # Compute at several temperatures
-    lifetime = False,       # Do not compute lifetime
+    broadening = False,     # Do not compute broadening
 
     write = True,           # Do write the results
     rootname = 'Out/1-2',   # Rootname for the output
