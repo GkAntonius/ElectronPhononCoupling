@@ -24,7 +24,7 @@ class Test_LiF_g2(SETest):
         nqpt=test.nqpt,
         wtq=test.wtq,
         smearing_eV=0.01,
-        temp_range=[0,600,300],
+        temp_range=[0,300,300],
         omega_range=[-.1,.1,.001],
 
         rootname = 'epc.out',

@@ -167,8 +167,14 @@ class EpcAnalyzer(object):
         self.qptanalyzer.broadcast_zero_files()
 
     def set_temp_range(self, temp_range=(0, 0, 1)):
-        """Set the minimum, makimum and step temperature."""
-        self.temperatures = np.arange(*temp_range, dtype=float)
+        """Set the minimum, maximum and step temperature."""
+        args = list(temp_range)
+        assert len(args) == 3
+        minimum, maximum, step = args
+        if all([isinstance(i, int) for i in args]):
+            if (maximum - minimum) % step == 0:
+                maximum += 1
+        self.temperatures = np.arange(minimum, maximum, step, dtype=float)
         self.ntemp = len(self.temperatures)
         self.qptanalyzer.temperatures = self.temperatures
 

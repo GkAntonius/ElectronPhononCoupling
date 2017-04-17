@@ -1,17 +1,15 @@
 """
-Compute the zero-point broadening (ZPB)
-using the static AHC theory
-with separation between 'active' and 'sternheimer' part of self-energy
+Compute the zero-point renormalization (ZPR) using the dynamical AHC theory
 (ieig2rf=5).
 """
 
-from ElectronPhononCoupling import compute_epc
+from ElectronPhononCoupling import compute
 
 
 # Lists of files used
 # ===================
 
-DDB_fnames = """
+ddb_fnames = """
 Calculations/01-LiF-dynamical/odat_calc_DS5_DDB.nc
 Calculations/01-LiF-dynamical/odat_calc_DS9_DDB.nc
 Calculations/01-LiF-dynamical/odat_calc_DS13_DDB.nc
@@ -23,45 +21,44 @@ Calculations/01-LiF-dynamical/odat_calc_DS10_EIG.nc
 Calculations/01-LiF-dynamical/odat_calc_DS14_EIG.nc
 """.split()
 
-EIGR2D_fnames = """
+eigr2d_fnames = """
 Calculations/01-LiF-dynamical/odat_calc_DS7_EIGR2D.nc
 Calculations/01-LiF-dynamical/odat_calc_DS11_EIGR2D.nc
 Calculations/01-LiF-dynamical/odat_calc_DS15_EIGR2D.nc
 """.split()
 
-GKK_fnames = """
+gkk_fnames = """
 Calculations/01-LiF-dynamical/odat_calc_DS7_GKK.nc
 Calculations/01-LiF-dynamical/odat_calc_DS11_GKK.nc
 Calculations/01-LiF-dynamical/odat_calc_DS15_GKK.nc
 """.split()
 
-eig0_fname = 'Calculations/01-LiF-dynamical/odat_calc_DS3_EIG.nc'
+eigk_fname = 'Calculations/01-LiF-dynamical/odat_calc_DS3_EIG.nc'
 
 
-# Computation of the ZPB
+# Computation of the ZPR
 # ======================
 
-epc = compute_epc(
-    calc_type = 3,          # Perform static AHC calculation
-    temperature = False,    # Do not compute temperature dependence
-    lifetime = True,        # Do compute lifetime
+epc = compute(
+    renormalization = True, # Compute the eigenvalues renormalization
+    lifetime = False,       # Do not compute lifetime
+    temperature = False,    # Compute only at T=0
+    dynamical = False,      # Do a static calculation.
 
     write = True,           # Do write the results
-    output = 'Out/2-3',     # Rootname for the output
+    rootname = 'Out/1-6',   # Rootname for the output
     
-    smearing_eV = 0.01,         # Imaginary parameter for broadening.
+    smearing_eV = 0.01,     # Imaginary parameter for broadening.
 
     nqpt = 3,                   # Number of q-points (2x2x2 qpt grid)
     wtq = [0.125, 0.5, 0.375],  # Weights of the q-points.
                                 # These can be obtained by running Abinit
                                 # with the corresponding k-point grid.
     
-    eig0_fname = eig0_fname,        # All the files needed for
+    eigk_fname = eigk_fname,        # All the files needed for
     eigq_fnames = eigq_fnames,      # this calculation.
-    DDB_fnames = DDB_fnames,        #
-    EIGR2D_fnames = EIGR2D_fnames,  #
-    GKK_fnames = GKK_fnames,        # Note that instead of GKK.nc files,
-                                    # one can also use the FAN.nc files
-                                    # with the FAN_fnames keyword argument.
+    ddb_fnames = ddb_fnames,        #
+    eigr2d_fnames = eigr2d_fnames,  #
+    gkk_fnames = gkk_fnames,        #
     )
 

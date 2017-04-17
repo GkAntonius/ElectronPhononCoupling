@@ -23,8 +23,7 @@ class Test_LiF_g4(SETest):
         nqpt = nqpt,
         wtq = wtq,
         smearing_eV = 0.01,
-        #temp_range = [0, 600, 50],
-        temp_range = [0, 600, 300],
+        temp_range = [0, 300, 300],
         omega_range = [-0.1, 0.1, 0.001],
         rootname = 'epc.out',
         **fnames)
