@@ -510,15 +510,56 @@ class QptAnalyzer(object):
 
         return fan, ddw
 
+    def get_self_energy(self,
+                        mode=False,
+                        temperature=False,
+                        omega=False,
+                        dynamical=True,
+                        only_sternheimer=False,
+                        only_active=False,
+                        ):
+
+        if only_sternheimer and only_active:
+            raise Exception(
+            'only_sternheimer and only_active cannot be True at the same time')
+
+        elif only_sternheimer:
+            fan, ddw = self.get_fan_ddw_sternheimer(
+                mode=mode,
+                temperature=temperature,
+                omega=omega,
+                )
+
+        elif only_active:
+            fan, ddw = self.get_fan_ddw_active(
+                mode=mode,
+                temperature=temperature,
+                omega=omega,
+                dynamical=dynamical)
+
+        else:
+            fan, ddw = self.get_fan_ddw(
+                mode=mode,
+                temperature=temperature,
+                omega=omega,
+                dynamical=dynamical)
+
+        se = self.wtq * (fan - ddw)
+        se = self.eig0.make_average(se)
+    
+        return se
+
     def get_zpr_static_sternheimer(self):
         """Compute the q-point zpr contribution in a static scheme."""
-    
-        # nkpt, nband
-        fan, ddw = self.get_fan_ddw_sternheimer(mode=False, omega=False, temperature=False)
-    
-        self.zpr = self.wtq * (fan - ddw)
-        self.zpr = self.eig0.make_average(self.zpr)
-    
+
+        self.zpr = self.get_self_energy(
+            mode=False,
+            temperature=False,
+            omega=False,
+            dynamical=False,
+            only_sternheimer=True,
+            only_active=False,
+            ).real
         return self.zpr
 
     def get_zpr_static(self):
@@ -526,13 +567,14 @@ class QptAnalyzer(object):
         Compute the q-point zpr contribution in a static scheme,
         with the transitions split between active and sternheimer.
         """
-
-        # nkpt, nband
-        fan, ddw = self.get_fan_ddw(mode=False, temperature=False, omega=False, dynamical=False)
-
-        self.zpr = self.wtq * (fan - ddw).real
-        self.zpr = self.eig0.make_average(self.zpr)
-      
+        self.zpr = self.get_self_energy(
+            mode=False,
+            temperature=False,
+            omega=False,
+            dynamical=False,
+            only_sternheimer=False,
+            only_active=False,
+            ).real
         return self.zpr
 
     def get_zpr_dynamical(self):
@@ -540,14 +582,14 @@ class QptAnalyzer(object):
         Compute the q-point zpr contribution in a static scheme
         with the transitions split between active and sternheimer.
         """
-
-        fan, ddw = self.get_fan_ddw(
-            mode=False, temperature=False, omega=False, dynamical=True)
-
-        self.zpr = (fan - ddw) * self.wtq
-
-        self.zpr = self.eig0.make_average(self.zpr)
-
+        self.zpr = self.get_self_energy(
+            mode=False,
+            temperature=False,
+            omega=False,
+            dynamical=True,
+            only_sternheimer=False,
+            only_active=False,
+            ).real
         return self.zpr
 
     def get_zpb_dynamical(self):
@@ -667,6 +709,9 @@ class QptAnalyzer(object):
         natom = self.natom
     
         nomegase = self.nomegase
+
+        ntemp = 1
+        temperatures = zeros(1)
       
         self.sigma = zeros((nkpt, nband, nomegase), dtype=complex)
       
@@ -693,30 +738,43 @@ class QptAnalyzer(object):
         ddw_tmp = np.sum(ddw_num, axis=3)
     
         # nband
-        occ = self.get_occ_nospin()
+        occ0 = self.get_occ_nospin()
     
+        # Fermi-Dirac occupation number
+        # nspin, nkpt, nband, ntemp
+        occ = self.eigq.get_fermi_function(self.mu, temperatures)
+
         # nkpt, nband, nband
         delta_E_ddw = (einsum('kn,m->knm', self.eig0.EIG[0,:,:].real, ones(nband))
                      - einsum('kn,m->kmn', self.eig0.EIG[0,:,:].real, ones(nband))
-                     - einsum('kn,m->knm', ones((nkpt,nband)), (2*occ-1)) * self.smearing * 1j)
+                     - einsum('kn,m->knm', ones((nkpt,nband)), (2*occ0-1)) * self.smearing * 1j)
     
         # nkpt, nband
         ddw_add = einsum('knm,knm->kn', ddw_tmp, 1.0 / delta_E_ddw)
         ddw_add = einsum('kn,l->lkn', ddw_add, ones(nomegase))
     
         # nband
-        num1 = 1.0 - occ
+        num1 = 1.0 - occ[0,:,:,0]
+        num2 = occ[0,:,:,0]
     
         # nomegase, nkpt, nband
         fan_add = zeros((nomegase, nkpt, nband), dtype=complex)
     
+        # FIXME These should be the occ at k
+        # nkpt, nband
+        eta = (2 * occ[0,:,:,0] - 1) * self.smearing * 1j
+
         for kband in range(nband):
+
+            #eta = ones((nkpt, nband)) * (2*occ0[kband]-1) * self.smearing * 1j
+            #eta = einsum('n,k->kn', ones(nband), (2*occ[0,:,kband,0]-1) * self.smearing * 1j)
     
             # nkpt, nband
             # delta_E[ikpt,jband] = E[ikpt,jband] - E[ikpt,kband] - (2f[kband] -1) * eta * 1j
-            delta_E = (self.eig0.EIG[0,:,:].real
-                     - einsum('k,n->kn', self.eigq.EIG[0,:,kband].real, ones(nband))
-                     - ones((nkpt,nband)) * (2*occ[kband]-1) * self.smearing * 1j)
+            delta_E = (
+                self.eig0.EIG[0,:,:].real
+              - einsum('k,n->kn', self.eigq.EIG[0,:,kband].real, ones(nband))
+              - eta)
     
             # nkpt, nband, nomegase
             # delta_E_omega[ikpt,jband,lomega] = omega[lomega] + E[ikpt,jband] - E[ikpt,kband] - (2f[kband] -1) * eta * 1j
@@ -728,7 +786,7 @@ class QptAnalyzer(object):
                    - einsum('knl,o->knlo', ones((nkpt,nband,nomegase)), omega))
     
             # nmode, nkpt, nband, nomegase
-            div1 = num1[kband] * einsum('knlo->oknl', 1.0 / deno1)
+            div1 = einsum('k,knlo->oknl', num1[:,kband], 1.0 / deno1)
     
             del deno1
     
@@ -739,7 +797,7 @@ class QptAnalyzer(object):
             del delta_E_omega
     
             # nmode, nkpt, nband, nomegase
-            div2 = occ[kband] * einsum('knlo->oknl', 1.0 / deno2)
+            div2 = einsum('k,knlo->oknl', num2[:,kband], 1.0 / deno2)
     
             del deno2
     
@@ -774,19 +832,16 @@ class QptAnalyzer(object):
     
         Returns: sigma[nkpt,nband,nomegase,ntemp]
         """
-    
-        # ntemp, nomegase, nkpt, nband
-        fan_stern,  ddw_stern  = self.get_fan_ddw_sternheimer(mode=False, temperature=True, omega=True)
-        fan_active, ddw_active = self.get_fan_ddw_active(mode=False, omega=True, temperature=True)
-      
-        self.sigma =  self.wtq * (
-            (fan_active - ddw_active) + (fan_stern - ddw_stern))
-
-        self.sigma = self.eig0.make_average(self.sigma)
-
+        self.sigma = self.get_self_energy(
+            mode=False,
+            temperature=True,
+            omega=True,
+            dynamical=True,
+            only_sternheimer=False,
+            only_active=False,
+            )
         # nkpt, nband, nomegase, nband
-        self.sigma = einsum('tlkn->knlt', self.sigma)
-      
+        self.sigma = einsum('tlkn->knlt', self.sigma) # FIXME why??
         return self.sigma
 
     def get_tdr_static(self):
