@@ -8,7 +8,7 @@ from .constants import tol6, tol8, tol12, Ha2eV, kb_HaK
 from .mathutil import delta_lorentzian
 from . import EigFile, Eigr2dFile, FanFile, DdbFile, GkkFile
 
-__author__ = "Gabriel Antonius, Samuel Ponce"
+__author__ = "Gabriel Antonius"
 
 __all__ = ['QptAnalyzer']
 
@@ -169,14 +169,26 @@ class QptAnalyzer(object):
     def get_max_val(self):
         """Get the maximum valence band energy."""
         occ0 = self.get_occ_nospin()
-        nband_occ = int(sum(occ0[:]))
-        return np.max(self.eigq.EIG[0,:,nband_occ-1])
+        eig = self.eigq.EIG[0,0,:]
+
+        E_last = eig[0]
+        for f, E in zip(occ0, eig):
+            if f < 0.5:
+                break
+            E_last = E
+
+        return E_last
 
     def get_min_cond(self):
         """Get the minimum conduction band energy."""
         occ0 = self.get_occ_nospin()
-        nband_occ = int(sum(occ0[:]))
-        return np.min(self.eigq.EIG[0,:,nband_occ])
+        eig = self.eigq.EIG[0,0,:]
+
+        for f, E in zip(occ0, eig):
+            if f <= 0.5:
+                break
+
+        return E
 
     def find_fermi_level(self):
         """
@@ -184,6 +196,34 @@ class QptAnalyzer(object):
         at all k+q points available. Assuming a gapped system.
         """
         return (self.get_max_val() + self.get_min_cond()) / 2.0
+
+    @staticmethod
+    def reduce_array(arr, mode=False, temperature=False, omega=False):
+        """
+        Eliminate dimensions from an array of shape
+        (nmode, ntemp, nomegase, nkpt, nband)
+        by summing over any or all of the first three dimension.
+
+        mode:
+            Keep the first dimension
+        temperature:
+            Keep the second dimension
+        omega:
+            Keep the third dimension
+        """
+        # Find the final order of 
+        final_indices = ''
+        if mode:
+            final_indices += 'o'
+        if temperature:
+            final_indices += 't'
+        if omega:
+            final_indices += 'l'
+        final_indices += 'kn'
+
+        summation = 'otlkn->' + final_indices
+
+        return einsum(summation, arr)
 
     def get_fan_ddw_sternheimer(self, mode=False, omega=False, temperature=False):
         """
@@ -206,7 +246,6 @@ class QptAnalyzer(object):
 
         In the semi-static approximation, these quantities do not actually
         depend on omega, so the arrays are simply repated along the omega axis.
-
         """
 
         nkpt = self.nkpt
@@ -240,20 +279,9 @@ class QptAnalyzer(object):
         fan = einsum('otkn,l->otlkn', fan, odep)
         ddw = einsum('otkn,l->otlkn', ddw, odep)
 
-        # Find the final order of 
-        final_indices = ''
-        if mode:
-            final_indices += 'o'
-        if temperature:
-            final_indices += 't'
-        if omega:
-            final_indices += 'l'
-        final_indices += 'kn'
-
-        summation = 'otlkn->' + final_indices
-
-        fan = einsum(summation, fan)
-        ddw = einsum(summation, ddw)
+        # Reduce the arrays
+        fan = self.reduce_array(fan, mode=mode, temperature=temperature, omega=omega)
+        ddw = self.reduce_array(ddw, mode=mode, temperature=temperature, omega=omega)
 
         return fan, ddw
     
@@ -291,18 +319,182 @@ class QptAnalyzer(object):
       
         return fan, ddw
     
+    def get_fan_ddw_active(self, mode=False, omega=False, temperature=False, dynamical=True):
+        """
+        Compute the fan and ddw contributions to the self-energy
+        from the active space, that is, the the lower bands.
+
+        Returns: fan, ddw
+
+        The return arrays vary in dimensions, depending on the input arguments.
+        These arrays are at most of dimension 5, as
+
+            fan[nmode, ntemp, nomegase, nkpt, nband]
+            ddw[nmode, ntemp, nomegase, nkpt, nband]
+
+        Depending on the truth value of the input arguments,
+        the dimension nomegase (omega) and ntemp (temperature)
+        will be eliminated. 
+        The dimension nmode will be summed over in case mode=False.
+
+        The Debye-Waller term does not actually depends on omega,
+        but this dimension is kept anyway.
+        """
+
+        nkpt = self.nkpt
+        nband = self.nband
+        natom = self.natom
+        nmode = self.nmode
+
+        if temperature:
+            ntemp = self.ntemp
+            temperatures = self.temperatures
+        else:
+            ntemp = 1
+            temperatures = zeros(1)
+
+        if omega:
+            nomegase = self.nomegase
+            omega_se = self.omegase
+        else:
+            # omega_se is measured from the bare eigenvalues
+            nomegase = 1
+            omega_se = zeros(1)
+
+        if dynamical:
+            omega_q = self.ddb.omega[:].real
+        else:
+            omega_q = zeros(nmode)
+
+        # Bose-Enstein occupation number
+        # ntemp
+        bose = self.ddb.get_bose(temperatures)
+
+        # Fermi-Dirac occupation number
+        # nspin, nkpt, nband, ntemp
+        occ = self.eigq.get_fermi_function(self.mu, temperatures)
+
+        # nband
+        occ0 = self.get_occ_nospin()
+    
+        # G^2
+        # nkpt, nband, nband, nmode
+        fan_num, ddw_num = self.get_fan_ddw_gkk2_active()
+
+
+        # DDW term
+        # --------
+
+        # nkpt, nband, nband
+        delta_E_ddw = (einsum('kn,m->knm', self.eig0.EIG[0,:,:].real, ones(nband))
+                     - einsum('kn,m->kmn', self.eig0.EIG[0,:,:].real, ones(nband))
+                     - einsum('kn,m->knm', ones((nkpt,nband)), (2*occ0-1)) * self.smearing * 1j)
+
+        # nkpt, nband, nmode
+        ddw = einsum('knmo,knm->okn', ddw_num, 1.0 / delta_E_ddw)
+
+        # ntemp, nkpt, nband
+
+        tdep = 2 * bose + 1 if temperature else ones((nmode, ntemp))
+
+        # FIXME This is not optimal: The mode indices will be summed
+        #       so there is no need to create an array this big.
+        #       in case omega=True and mode=False
+        ddw = einsum('okn,ot->otkn', ddw, tdep)
+
+        odep = ones(nomegase) if omega else ones(0)
+
+        # ntemp, nomega, nkpt, nband
+        ddw = einsum('otkn,l->otlkn', ddw, ones(nomegase))
+
+        # Reduce the arrays
+        ddw = self.reduce_array(ddw, mode=mode, temperature=temperature, omega=omega)
+
+
+        # Fan term
+        # --------
+
+        # nomegase, ntemp, nkpt, nband
+        fan = zeros((nmode, ntemp, nomegase, nkpt, nband), dtype=complex)
+
+        if temperature:
+            n_B = bose
+        else:
+            n_B = zeros((nmode,1))
+
+        # nkpt, nband, nmode, ntemp
+        # n + 1 - f
+        num1 = (einsum('ot,kn->knot', n_B, ones((nkpt,nband)))
+              + 1. - einsum('knt,o->knot', occ[0,:,:,:], ones(nmode)))
+
+        # nkpt, nband, nmode, ntemp
+        # n + f
+        num2 = (einsum('ot,kn->knot', n_B, ones((nkpt,nband)))
+              + einsum('knt,o->knot', occ[0,:,:,:], ones(nmode)))
+    
+        for kband in range(nband):
+    
+            # nkpt, nband
+            # delta_E[ikpt,jband] = E[ikpt,jband] - E[ikpt,kband] - (2f[kband] -1) * eta * 1j
+            delta_E = (self.eig0.EIG[0,:,:].real
+                       - einsum('k,n->kn', self.eigq.EIG[0,:,kband].real, ones(nband))
+                       - ones((nkpt,nband)) * (2*occ0[kband]-1) * self.smearing * 1j)
+    
+            # nkpt, nband, nomegase
+            # delta_E_omega[ikpt,jband,lomega] = omega[lomega] + E[ikpt,jband] - E[ikpt,kband] - (2f[kband] -1) * eta * 1j
+            delta_E_omega = (einsum('kn,l->knl', delta_E, ones(nomegase))
+                           + einsum('kn,l->knl', ones((nkpt,nband)), omega_se))
+    
+            # nkpt, nband, nomegase, nmode
+            deno1 = (einsum('knl,o->knlo', delta_E_omega, ones(3*natom))
+                   - einsum('knl,o->knlo', ones((nkpt,nband,nomegase)), omega_q))
+
+            # nmode, nkpt, nband, nomegase, ntemp
+            div1 = einsum('knot,knlo->oknlt', num1, 1.0 / deno1)
+    
+            del deno1
+    
+            # nkpt, nband, nomegase, nmode
+            deno2 = (einsum('knl,o->knlo', delta_E_omega, ones(3*natom))
+                   + einsum('knl,o->knlo', ones((nkpt,nband,nomegase)), omega_q))
+    
+    
+            # nmode, nkpt, nband, nomegase, ntemp
+            div2 = einsum('knot,knlo->oknlt', num2, 1.0 / deno2)
+
+            del deno2
+    
+            # FIXME This is not optimal: The mode indices will be summed
+            #       so there is no need to create an array this big.
+            # in case omega=True and mode=False
+
+            # nmode, ntemp, nomegase, nkpt, nband
+            fan += einsum('kno,oknlt->otlkn', fan_num[:,:,kband,:], div1 + div2)
+    
+            del div1, div2
+      
+        # Reduce the arrays
+        fan = self.reduce_array(fan, mode=mode, temperature=temperature, omega=omega)
+
+        return fan, ddw
+
+    def get_fan_ddw(self, mode=False, temperature=False, omega=False, dynamical=False):
+
+        fan_stern, ddw_stern = self.get_fan_ddw_sternheimer(mode=False, temperature=False, omega=False)
+        fan_active, ddw_active = self.get_fan_ddw_active(mode=False, temperature=False, omega=False, dynamical=False)
+
+        fan = fan_active + fan_stern
+        ddw = ddw_active + ddw_stern
+
+        return fan, ddw
 
     def get_zpr_static_sternheimer(self):
         """Compute the q-point zpr contribution in a static scheme."""
     
-        # First index is to separate zpr, fan, ddw
-        self.zpr = zeros((self.eigr2d.nkpt, self.eigr2d.nband), dtype=complex)
-    
         # nkpt, nband
         fan, ddw = self.get_fan_ddw_sternheimer(mode=False, omega=False, temperature=False)
     
-        self.zpr = (fan - ddw) * self.wtq
-    
+        self.zpr = self.wtq * (fan - ddw)
         self.zpr = self.eig0.make_average(self.zpr)
     
         return self.zpr
@@ -312,61 +504,11 @@ class QptAnalyzer(object):
         Compute the q-point zpr contribution in a static scheme,
         with the transitions split between active and sternheimer.
         """
-    
-        nkpt = self.eigr2d.nkpt
-        nband = self.eigr2d.nband
-        natom = self.eigr2d.natom
-      
-        self.zpr = zeros((nkpt, nband), dtype=complex)
-      
-        fan_term = zeros((nkpt, nband), dtype=complex)
-        ddw_term = zeros((nkpt, nband), dtype=complex)
-        fan_active  = zeros((nkpt, nband), dtype=complex)
-        ddw_active  = zeros((nkpt, nband), dtype=complex)
-      
-        # Sternheimer contribution
-        # ------------------------
-      
-        # nmode, nkpt, nband
-        fan_term, ddw_term = self.get_fan_ddw_sternheimer(mode=False, temperature=False, omega=False)
-      
-        # Active space contribution
-        # -------------------------
-      
-        # nkpt, nband, nband, nmode
-        fan_num, ddw_num = self.get_fan_ddw_gkk2_active()
 
-        # nkpt, nband, nband
-        fan_tmp = np.sum(fan_num, axis=3)
-        ddw_tmp = np.sum(ddw_num, axis=3)
-      
-        # nkpt, nband, nband
-        delta_E = (einsum('ij,k->ijk', self.eig0.EIG[0,:,:].real, ones(nband))
-                 - einsum('ij,k->ikj', self.eigq.EIG[0,:,:].real, ones(nband)))
-    
-        # nkpt, nband, nband
-        delta_E_ddw = (einsum('ij,k->ijk', self.eig0.EIG[0,:,:].real, ones(nband))
-                     - einsum('ij,k->ikj', self.eig0.EIG[0,:,:].real, ones(nband)))
-    
-        # nkpt, nband, nband
-        div =  delta_E / (delta_E ** 2 + self.smearing ** 2)
-    
         # nkpt, nband
-        fan_active = einsum('ijk,ijk->ij', fan_tmp, div)
-    
-        # nkpt, nband, nband
-        div_ddw = delta_E_ddw / (delta_E_ddw ** 2 + self.smearing ** 2)
-    
-        # nkpt, nband
-        ddw_active = einsum('ijk,ijk->ij', ddw_tmp, div_ddw)
-    
-      
-        # Correction from active space 
-        fan_term += fan_active
-        ddw_term += ddw_active
-    
-        self.zpr = (fan_term - ddw_term) * self.wtq
-    
+        fan, ddw = self.get_fan_ddw(mode=False, temperature=False, omega=False, dynamical=False)
+
+        self.zpr = self.wtq * (fan - ddw).real
         self.zpr = self.eig0.make_average(self.zpr)
       
         return self.zpr
@@ -376,15 +518,22 @@ class QptAnalyzer(object):
         Compute the q-point zpr contribution in a static scheme
         with the transitions split between active and sternheimer.
         """
+
+        # # nkpt, nband
+        # fan, ddw = self.get_fan_ddw(mode=False, temperature=False, omega=False, dynamical=True)
+        # self.zpr = self.wtq * (fan - ddw).real
+        # self.zpr = self.eig0.make_average(self.zpr)
+        # return self.zpr
     
+
         nkpt = self.eigr2d.nkpt
         nband = self.eigr2d.nband
         natom = self.eigr2d.natom
       
         self.zpr = zeros((nkpt, nband), dtype=complex)
       
-        fan_term = zeros((nkpt, nband), dtype=complex)
-        ddw_term = zeros((nkpt, nband), dtype=complex)
+        fan = zeros((nkpt, nband), dtype=complex)
+        ddw = zeros((nkpt, nband), dtype=complex)
         fan_active  = zeros((nkpt, nband), dtype=complex)
         ddw_active  = zeros((nkpt, nband), dtype=complex)
       
@@ -392,7 +541,7 @@ class QptAnalyzer(object):
         # ------------------------
       
         # nmode, nkpt, nband
-        fan_term, ddw_term = self.get_fan_ddw_sternheimer(mode=False, temperature=False, omega=False)
+        fan_stern, ddw_stern = self.get_fan_ddw_sternheimer(mode=False, temperature=False, omega=False)
       
         # Active space contribution
         # -------------------------
@@ -400,59 +549,70 @@ class QptAnalyzer(object):
         # nkpt, nband, nband, nmode
         fan_num, ddw_num = self.get_fan_ddw_gkk2_active()
     
-        # nkpt, nband, nband
-        ddw_tmp = np.sum(ddw_num, axis=3)
-    
         # nband
         if any(self.eigr2d.occ[0,0,:] == 2.0):
             occ = self.eigr2d.occ[0,0,:]/2
         else:
             occ = self.eigr2d.occ[0,0,:]
+
+        # DEBUG
+        print(occ)
+        # END DEBUG
+
+        # nspin, nkpt, nband, ntemp
+        # FIXME this is the source of the error.
+        occ = self.eigq.get_fermi_function(self.mu, zeros(1))
+        # nband
+        occ = occ[0,0,:,0]
+
+        # DEBUG
+        #print(occ)
+        #print(self.mu)
+        #print(self.eigq.EIG[0,:,:])
+        # END DEBUG
     
+        #occ = self.eigq.get_fermi_function_T0(self.mu)
+        #occ = einsum('skn,t->sknt', occ, ones(1))
+
         # nkpt, nband, nband
         delta_E = (einsum('ij,k->ijk', self.eig0.EIG[0,:,:].real, ones(nband))
                  - einsum('ij,k->ikj', self.eigq.EIG[0,:,:].real, ones(nband))
                  - einsum('ij,k->ijk', ones((nkpt,nband)), (2*occ-1)) * self.smearing * 1j)
     
-        # nkpt, nband, nband
-        delta_E_ddw = (einsum('ij,k->ijk', self.eig0.EIG[0,:,:].real, ones(nband))
-                     - einsum('ij,k->ikj', self.eig0.EIG[0,:,:].real, ones(nband))
-                     - einsum('ij,k->ijk', ones((nkpt,nband)), (2*occ-1)) * self.smearing * 1j)
-    
-        # nkpt, nband
-        ddw_active = einsum('ijk,ijk->ij', ddw_tmp, 1.0 / delta_E_ddw)
-    
         # nmode
-        omega = self.ddb.omega[:].real
+        omega_q = self.ddb.omega[:].real
     
         # nband
         num1 = 1.0 - occ
+        num2 = occ
     
         # nkpt, nband, nband, nmode
-        deno1 = (einsum('ijk,l->ijkl', delta_E, ones(3*natom))
-               - einsum('ijk,l->ijkl', ones((nkpt,nband,nband)), omega))
+        deno1 = (einsum('knm,o->knmo', delta_E, ones(3*natom))
+               - einsum('knm,o->knmo', ones((nkpt,nband,nband)), omega_q))
     
         # nmode, nband, nkpt, nband
-        div1 = einsum('i,jkil->lijk', num1, 1.0 / deno1)
+        div1 = einsum('m,knmo->omkn', num1, 1.0 / deno1)
     
         # nkpt, nband, nband, nmode
-        deno2 = (einsum('ijk,l->ijkl', delta_E, ones(3*natom))
-               + einsum('ijk,l->ijkl', ones((nkpt,nband,nband)), omega))
+        deno2 = (einsum('knm,o->knmo', delta_E, ones(3*natom))
+               + einsum('knm,o->knmo', ones((nkpt,nband,nband)), omega_q))
     
         # nmode, nband, nkpt, nband
-        div2 = einsum('i,jkil->lijk', occ, 1.0 / deno2)
+        div2 = einsum('m,knmo->omkn', num2, 1.0 / deno2)
     
         # nkpt, nband
-        fan_active = einsum('ijkl,lkij->ij', fan_num, div1 + div2)
+        fan_active = einsum('knmo,omkn->kn', fan_num, div1 + div2)
     
+        # FIXME I dont get the same result here....
+        tmp_fan_active, ddw_active = self.get_fan_ddw_active(mode=False, temperature=False, omega=False, dynamical=True)
 
         # Summing Sternheimer and active space contributions
         # --------------------------------------------------
 
-        fan_term += fan_active
-        ddw_term += ddw_active
+        fan = fan_stern + fan_active
+        ddw = ddw_stern + ddw_active
     
-        self.zpr = (fan_term - ddw_term) * self.wtq
+        self.zpr = (fan - ddw) * self.wtq
     
         self.zpr = self.eig0.make_average(self.zpr)
       
@@ -581,15 +741,15 @@ class QptAnalyzer(object):
         # nmode
         omega = self.ddb.omega[:].real
     
-        fan_term = zeros((nomegase, nkpt, nband), dtype=complex)
-        ddw_term = zeros((nkpt, nband), dtype=complex)
+        fan = zeros((nomegase, nkpt, nband), dtype=complex)
+        ddw = zeros((nkpt, nband), dtype=complex)
         fan_add  = zeros((nomegase, nkpt,nband), dtype=complex)
         ddw_add  = zeros((nkpt, nband), dtype=complex)
       
         # Sternheimer contribution
         # ------------------------
       
-        fan_term, ddw_term = self.get_fan_ddw_sternheimer(mode=False, temperature=False, omega=True)
+        fan, ddw = self.get_fan_ddw_sternheimer(mode=False, temperature=False, omega=True)
       
         # Active space contribution
         # -------------------------
@@ -661,10 +821,10 @@ class QptAnalyzer(object):
         # --------------------------------------------------
       
 
-        fan_term += fan_add
-        ddw_term += ddw_add
+        fan += fan_add
+        ddw += ddw_add
     
-        self.sigma = (fan_term - ddw_term) * self.wtq
+        self.sigma = (fan - ddw) * self.wtq
     
         self.sigma = self.eig0.make_average(self.sigma)
         self.sigma = einsum('lkn->knl', self.sigma)
@@ -683,119 +843,12 @@ class QptAnalyzer(object):
         Returns: sigma[nkpt,nband,nomegase,ntemp]
         """
     
-        nkpt = self.nkpt
-        nband = self.nband
-        natom = self.natom
-        nmode = self.nmode
-        nomegase = self.nomegase
-        ntemp = self.ntemp
-      
-        # ntemp
-        bose = self.ddb.get_bose(self.temperatures)
-
-        # nmode
-        omega = self.ddb.omega[:].real
-    
-        self.sigma = zeros((nkpt, nband, nomegase, ntemp), dtype=complex)
-      
-        fan_term = zeros((nomegase, nkpt, nband), dtype=complex)
-        ddw_term = zeros((nkpt, nband), dtype=complex)
-        fan_add  = zeros((nomegase, nkpt,nband), dtype=complex)
-        ddw_add  = zeros((nkpt, nband), dtype=complex)
-      
-        # Sternheimer contribution
-        # ------------------------
-      
         # ntemp, nomegase, nkpt, nband
-        fan_term, ddw_term = self.get_fan_ddw_sternheimer(mode=False, temperature=True, omega=True)
-
-        # Active space contribution
-        # -------------------------
+        fan_stern,  ddw_stern  = self.get_fan_ddw_sternheimer(mode=False, temperature=True, omega=True)
+        fan_active, ddw_active = self.get_fan_ddw_active(mode=False, omega=True, temperature=True)
       
-        # nkpt, nband, nband, nmode
-        fan_num, ddw_num = self.get_fan_ddw_gkk2_active()
-    
-        # nspin, nkpt, nband, ntemp
-        occ = self.eigq.get_fermi_function(self.mu, self.temperatures)
-
-        # nband
-        occ0 = self.get_occ_nospin()
-    
-        # DDW term
-
-        # nkpt, nband, nband
-        delta_E_ddw = (einsum('kn,m->knm', self.eig0.EIG[0,:,:].real, ones(nband))
-                     - einsum('kn,m->kmn', self.eig0.EIG[0,:,:].real, ones(nband))
-                     - einsum('kn,m->knm', ones((nkpt,nband)), (2*occ0-1)) * self.smearing * 1j)
-
-        # nkpt, nband, nmode
-        ddw_add = einsum('knmo,knm->okn', ddw_num, 1.0 / delta_E_ddw)
-        ddw_add = einsum('okn,ot->tkn', ddw_add, 2 * bose + 1)
-        ddw_add = einsum('tkn,l->tlkn', ddw_add, ones(nomegase))
-
-    
-        # nkpt, nband, nmode, ntemp
-        # n + 1 - f
-        num1 = (einsum('ot,kn->knot', bose, ones((nkpt,nband)))
-              + 1. - einsum('knt,o->knot', occ[0,:,:,:], ones(nmode)))
-
-        # nkpt, nband, nmode, ntemp
-        # n + f
-        num2 = (einsum('ot,kn->knot', bose, ones((nkpt,nband)))
-              + einsum('knt,o->knot', occ[0,:,:,:], ones(nmode)))
-    
-        # nomegase, ntemp, nkpt, nband
-        fan_add = zeros((ntemp, nomegase, nkpt, nband), dtype=complex)
-    
-        for kband in range(nband):
-    
-            # nkpt, nband
-            # delta_E[ikpt,jband] = E[ikpt,jband] - E[ikpt,kband] - (2f[kband] -1) * eta * 1j
-            delta_E = (self.eig0.EIG[0,:,:].real
-                     - einsum('k,n->kn', self.eigq.EIG[0,:,kband].real, ones(nband))
-                     - ones((nkpt,nband)) * (2*occ0[kband]-1) * self.smearing * 1j)
-    
-            # nkpt, nband, nomegase
-            # delta_E_omega[ikpt,jband,lomega] = omega[lomega] + E[ikpt,jband] - E[ikpt,kband] - (2f[kband] -1) * eta * 1j
-            delta_E_omega = (einsum('kn,l->knl', delta_E, ones(nomegase))
-                           + einsum('kn,l->knl', ones((nkpt,nband)), self.omegase))
-    
-            # nkpt, nband, nomegase, nmode
-            deno1 = (einsum('knl,o->knlo', delta_E_omega, ones(3*natom))
-                   - einsum('knl,o->knlo', ones((nkpt,nband,nomegase)), omega))
-
-            deno1_inv = 1.0 / deno1
-            del deno1
-    
-            # nmode, nkpt, nband, nomegase, ntemp
-            div1 = einsum('knot,knlo->oknlt', num1, deno1_inv)
-    
-            del deno1_inv
-    
-            # nkpt, nband, nomegase, nmode
-            deno2 = (einsum('knl,o->knlo', delta_E_omega, ones(3*natom))
-                   + einsum('knl,o->knlo', ones((nkpt,nband,nomegase)), omega))
-    
-            del delta_E_omega
-            deno2_inv = 1.0 / deno2
-            del deno2
-    
-            # nmode, nkpt, nband, nomegase, ntemp
-            div2 = einsum('knot,knlo->oknlt', num2, deno2_inv)
-    
-            # nomegase, ntemp, nkpt, nband
-            fan_add += einsum('kno,oknlt->tlkn', fan_num[:,:,kband,:], div1 + div2)
-    
-            del div1, div2
-      
-    
-        # Summing Sternheimer and active space contributions
-        # --------------------------------------------------
-      
-        fan_term += fan_add
-        ddw_term += ddw_add
-
-        self.sigma = (fan_term - ddw_term) * self.wtq
+        self.sigma =  self.wtq * (
+            (fan_active - ddw_active) + (fan_stern - ddw_stern))
 
         self.sigma = self.eig0.make_average(self.sigma)
 
@@ -821,8 +874,8 @@ class QptAnalyzer(object):
     
         bose = self.ddb.get_bose(self.temperatures)
     
-        fan_term =  zeros((ntemp, nkpt, nband), dtype=complex)
-        ddw_term = zeros((ntemp, nkpt, nband), dtype=complex)
+        fan =  zeros((ntemp, nkpt, nband), dtype=complex)
+        ddw = zeros((ntemp, nkpt, nband), dtype=complex)
         fan_add = zeros((ntemp, nkpt, nband),dtype=complex)
         ddw_add = zeros((ntemp, nkpt, nband),dtype=complex)
     
@@ -830,7 +883,7 @@ class QptAnalyzer(object):
         # ------------------------
       
         # ntemp, nkpt, nband
-        fan_term, ddw_term = self.get_fan_ddw_sternheimer(mode=False, temperature=True, omega=False)
+        fan, ddw = self.get_fan_ddw_sternheimer(mode=False, temperature=True, omega=False)
       
         # Active space contribution
         # ------------------------
@@ -868,10 +921,10 @@ class QptAnalyzer(object):
         ddw_add = einsum('ijkl,lmijk->mij', ddw_num, div)
     
     
-        fan_term += fan_add
-        ddw_term += ddw_add
+        fan += fan_add
+        ddw += ddw_add
     
-        self.tdr = (fan_term - ddw_term) * self.wtq
+        self.tdr = (fan - ddw) * self.wtq
     
         self.tdr = self.eig0.make_average(self.tdr)
     
@@ -895,8 +948,8 @@ class QptAnalyzer(object):
     
         bose = self.ddb.get_bose(self.temperatures)
     
-        fan_term =  zeros((ntemp, nkpt, nband), dtype=complex)
-        ddw_term = zeros((ntemp, nkpt, nband), dtype=complex)
+        fan =  zeros((ntemp, nkpt, nband), dtype=complex)
+        ddw = zeros((ntemp, nkpt, nband), dtype=complex)
         fan_add = zeros((ntemp, nkpt, nband),dtype=complex)
         ddw_add = zeros((ntemp, nkpt, nband),dtype=complex)
     
@@ -904,7 +957,7 @@ class QptAnalyzer(object):
         # ------------------------
       
         # ntemp, nkpt, nband
-        fan_term, ddw_term = self.get_fan_ddw_sternheimer(mode=False, temperature=True, omega=False)
+        fan, ddw = self.get_fan_ddw_sternheimer(mode=False, temperature=True, omega=False)
       
         # Active space contribution
         # -------------------------
@@ -959,10 +1012,10 @@ class QptAnalyzer(object):
         fan_add = einsum('ijkl,lmkij->mij', fan_num, div1 + div2)
     
 
-        fan_term += fan_add
-        ddw_term += ddw_add
+        fan += fan_add
+        ddw += ddw_add
     
-        self.tdr = (fan_term - ddw_term) * self.wtq
+        self.tdr = (fan - ddw) * self.wtq
     
         self.tdr = self.eig0.make_average(self.tdr)
     
@@ -1019,8 +1072,8 @@ class QptAnalyzer(object):
       
         self.zpr = zeros((nmode, nkpt, nband), dtype=complex)
       
-        fan_term = zeros((nmode, nkpt, nband), dtype=complex)
-        ddw_term = zeros((nmode, nkpt, nband), dtype=complex)
+        fan = zeros((nmode, nkpt, nband), dtype=complex)
+        ddw = zeros((nmode, nkpt, nband), dtype=complex)
         fan_active  = zeros((nmode, nkpt, nband), dtype=complex)
         ddw_active  = zeros((nmode, nkpt, nband), dtype=complex)
       
@@ -1028,7 +1081,7 @@ class QptAnalyzer(object):
         # ------------------------
 
         # nmode, nkpt, nband
-        fan_term, ddw_term = self.get_fan_ddw_sternheimer(mode=True, temperature=False, omega=False)
+        fan, ddw = self.get_fan_ddw_sternheimer(mode=True, temperature=False, omega=False)
       
         # Active space contribution
         # -------------------------
@@ -1064,10 +1117,10 @@ class QptAnalyzer(object):
     
       
         # Correction from active space 
-        fan_term += fan_active
-        ddw_term += ddw_active
+        fan += fan_active
+        ddw += ddw_active
     
-        self.zpr = (fan_term - ddw_term) * self.wtq
+        self.zpr = (fan - ddw) * self.wtq
     
         self.zpr = self.eig0.make_average(self.zpr)
       
@@ -1106,26 +1159,15 @@ class QptAnalyzer(object):
         renormalization in a static scheme.
         """
     
-        # These indicies be swapped at the end
-        self.tdr = zeros((self.ntemp, self.eigr2d.nkpt, self.eigr2d.nband), dtype=complex)
+        # ntemp, nkpt, nband
+        fan, ddw = self.get_fan_ddw_sternheimer(mode=False, temperature=True, omega=False)
     
-        bose = self.ddb.get_bose(self.temperatures)
-    
-        fan_term = zeros((self.ntemp, self.eigr2d.nkpt, self.eigr2d.nband), dtype=complex)
-        ddw_term = zeros((self.ntemp, self.eigr2d.nkpt, self.eigr2d.nband), dtype=complex)
-    
-        # nmode, nkpt, nband
-        fan_stern, ddw_stern = self.get_fan_ddw_sternheimer(mode=True, temperature=False, omega=False)
-      
-        fan_term = einsum('ijk,il->ljk', fan_stern, 2*bose+1.)
-        ddw_term = einsum('ijk,il->ljk', ddw_stern, 2*bose+1.)
-    
-        self.tdr = (fan_term - ddw_term) * self.wtq
+        self.tdr = (fan - ddw) * self.wtq
     
         self.tdr = self.eig0.make_average(self.tdr)
 
         # nkpt, nband, ntemp
-        self.tdr = np.einsum('kij->ijk', self.tdr)
+        self.tdr = np.einsum('tkn->knt', self.tdr)
     
         return self.tdr
 

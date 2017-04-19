@@ -60,7 +60,6 @@ class EpcAnalyzer(object):
     def __init__(self,
                  # Options
                  asr=True,
-                 fermi_level = None,
                  verbose=False,
 
                  # Parameters
@@ -69,6 +68,7 @@ class EpcAnalyzer(object):
                  temp_range=[0,0,1],
                  omega_range=[0,0,1],
                  smearing=0.00367,
+                 fermi_level = None,
 
                  # File names
                  rootname='epc.out',
@@ -138,7 +138,12 @@ class EpcAnalyzer(object):
         self.set_omega_range(omega_range)
         self.set_smearing(smearing)
         self.set_output(rootname)
-        self.set_fermi_level(fermi_level)
+
+        # Set the fermi level
+        if fermi_level is None:
+            self.find_fermi_level()
+        else:
+            self.set_fermi_level(fermi_level)
 
         self.verbose = verbose
 
@@ -367,8 +372,12 @@ class EpcAnalyzer(object):
         partial = self.gather_qpt_function_me(func_name, *args, **kwargs)
 
         if i_am_master:
+
+            # Contruct an array with the shape of partial,
+            # adding a dimension of length nqpt.
             total = np.zeros([self.nqpt] + list(partial.shape[1:]),
                              dtype=partial.dtype)
+
             for i, arr in enumerate(partial):
                 total[i,...] = arr[...]
 
@@ -411,6 +420,8 @@ class EpcAnalyzer(object):
 
         q0 = np.array(getattr(self.qptanalyzer, func_name)(*args, **kwargs))
         total = np.zeros([nqpt_me] + list(q0.shape), dtype=q0.dtype)
+
+        total[0,...] = q0[...]
 
         if len(self.my_iqpts) == 1:
             return total
@@ -613,10 +624,6 @@ class EpcAnalyzer(object):
             Simga'_kn(omega,T) = Sigma_kn(omega + E^0_kn,T)
     
         """
-        # Make sure the fermi level is set
-        if self.mu is None:
-            self.find_fermi_level()
-
         self.self_energy_T = self.sum_qpt_function('get_td_self_energy')
 
     @master_only
