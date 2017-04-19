@@ -374,12 +374,15 @@ class QptAnalyzer(object):
         # nspin, nkpt, nband, ntemp
         occ = self.eigq.get_fermi_function(self.mu, temperatures)
 
+        # FIXME Here we need the occ at k
+        #       But these are the occ at k+q
+        #       (important for metals)
         # nband
         occ0 = self.get_occ_nospin()
     
         # G^2
         # nkpt, nband, nband, nmode
-        fan_num, ddw_num = self.get_fan_ddw_gkk2_active()
+        fan_g2, ddw_g2 = self.get_fan_ddw_gkk2_active()
 
 
         # DDW term
@@ -390,16 +393,16 @@ class QptAnalyzer(object):
                      - einsum('kn,m->kmn', self.eig0.EIG[0,:,:].real, ones(nband))
                      - einsum('kn,m->knm', ones((nkpt,nband)), (2*occ0-1)) * self.smearing * 1j)
 
-        # nkpt, nband, nmode
-        ddw = einsum('knmo,knm->okn', ddw_num, 1.0 / delta_E_ddw)
+        # nmode, nkpt, nband
+        ddw = einsum('knmo,knm->okn', ddw_g2, 1.0 / delta_E_ddw)
 
-        # ntemp, nkpt, nband
-
+        # nmode, ntemp
         tdep = 2 * bose + 1 if temperature else ones((nmode, ntemp))
 
         # FIXME This is not optimal: The mode indices will be summed
         #       so there is no need to create an array this big.
         #       in case omega=True and mode=False
+        # nmode, ntemp, nkpt, nband
         ddw = einsum('okn,ot->otkn', ddw, tdep)
 
         odep = ones(nomegase) if omega else ones(0)
@@ -408,13 +411,14 @@ class QptAnalyzer(object):
         ddw = einsum('otkn,l->otlkn', ddw, ones(nomegase))
 
         # Reduce the arrays
-        ddw = self.reduce_array(ddw, mode=mode, temperature=temperature, omega=omega)
+        ddw = self.reduce_array(ddw, mode=mode,
+                                temperature=temperature, omega=omega)
 
 
         # Fan term
         # --------
 
-        # nomegase, ntemp, nkpt, nband
+        # nmode, ntemp, nomegase, nkpt, nband
         fan = zeros((nmode, ntemp, nomegase, nkpt, nband), dtype=complex)
 
         if temperature:
@@ -422,31 +426,41 @@ class QptAnalyzer(object):
         else:
             n_B = zeros((nmode,1))
 
+        # FIXME These should be the occ at k+q
         # nkpt, nband, nmode, ntemp
         # n + 1 - f
         num1 = (einsum('ot,kn->knot', n_B, ones((nkpt,nband)))
               + 1. - einsum('knt,o->knot', occ[0,:,:,:], ones(nmode)))
 
+        # FIXME These should be the occ at k+q
         # nkpt, nband, nmode, ntemp
         # n + f
         num2 = (einsum('ot,kn->knot', n_B, ones((nkpt,nband)))
               + einsum('knt,o->knot', occ[0,:,:,:], ones(nmode)))
-    
-        for kband in range(nband):
-    
+
+        # FIXME These should be the occ at k
+        # nkpt, nband
+        eta = (2 * occ[0,:,:,0] - 1) * self.smearing * 1j
+
+        for jband in range(nband):
+
+            # FIXME These should be the occ at k, not at k+q
             # nkpt, nband
-            # delta_E[ikpt,jband] = E[ikpt,jband] - E[ikpt,kband] - (2f[kband] -1) * eta * 1j
-            delta_E = (self.eig0.EIG[0,:,:].real
-                       - einsum('k,n->kn', self.eigq.EIG[0,:,kband].real, ones(nband))
-                       - ones((nkpt,nband)) * (2*occ0[kband]-1) * self.smearing * 1j)
+            #eta = (ones((nkpt,nband)) * (2 * occ0[jband] - 1)
+            #       * self.smearing * 1j)
+
+            # nkpt, nband
+            delta_E = (
+                self.eig0.EIG[0,:,:].real
+              - einsum('k,n->kn', self.eigq.EIG[0,:,jband].real, ones(nband))
+              - eta)
     
             # nkpt, nband, nomegase
-            # delta_E_omega[ikpt,jband,lomega] = omega[lomega] + E[ikpt,jband] - E[ikpt,kband] - (2f[kband] -1) * eta * 1j
             delta_E_omega = (einsum('kn,l->knl', delta_E, ones(nomegase))
                            + einsum('kn,l->knl', ones((nkpt,nband)), omega_se))
     
             # nkpt, nband, nomegase, nmode
-            deno1 = (einsum('knl,o->knlo', delta_E_omega, ones(3*natom))
+            deno1 = (einsum('knl,o->knlo', delta_E_omega, ones(nmode))
                    - einsum('knl,o->knlo', ones((nkpt,nband,nomegase)), omega_q))
 
             # nmode, nkpt, nband, nomegase, ntemp
@@ -455,9 +469,8 @@ class QptAnalyzer(object):
             del deno1
     
             # nkpt, nband, nomegase, nmode
-            deno2 = (einsum('knl,o->knlo', delta_E_omega, ones(3*natom))
+            deno2 = (einsum('knl,o->knlo', delta_E_omega, ones(nmode))
                    + einsum('knl,o->knlo', ones((nkpt,nband,nomegase)), omega_q))
-    
     
             # nmode, nkpt, nband, nomegase, ntemp
             div2 = einsum('knot,knlo->oknlt', num2, 1.0 / deno2)
@@ -469,7 +482,7 @@ class QptAnalyzer(object):
             # in case omega=True and mode=False
 
             # nmode, ntemp, nomegase, nkpt, nband
-            fan += einsum('kno,oknlt->otlkn', fan_num[:,:,kband,:], div1 + div2)
+            fan += einsum('kno,oknlt->otlkn', fan_g2[:,:,jband,:], div1 + div2)
     
             del div1, div2
       
@@ -528,7 +541,10 @@ class QptAnalyzer(object):
 
         nkpt = self.eigr2d.nkpt
         nband = self.eigr2d.nband
-        natom = self.eigr2d.natom
+        nmode = self.nmode
+
+        # nmode
+        omega_q = self.ddb.omega[:].real
       
         self.zpr = zeros((nkpt, nband), dtype=complex)
       
@@ -547,61 +563,66 @@ class QptAnalyzer(object):
         # -------------------------
       
         # nkpt, nband, nband, nmode
-        fan_num, ddw_num = self.get_fan_ddw_gkk2_active()
+        fan_g2, ddw_g2 = self.get_fan_ddw_gkk2_active()
     
-        # nband
-        if any(self.eigr2d.occ[0,0,:] == 2.0):
-            occ = self.eigr2d.occ[0,0,:]/2
-        else:
-            occ = self.eigr2d.occ[0,0,:]
-
-        # DEBUG
-        print(occ)
-        # END DEBUG
-
         # nspin, nkpt, nband, ntemp
-        # FIXME this is the source of the error.
         occ = self.eigq.get_fermi_function(self.mu, zeros(1))
-        # nband
-        occ = occ[0,0,:,0]
 
-        # DEBUG
-        #print(occ)
-        #print(self.mu)
-        #print(self.eigq.EIG[0,:,:])
-        # END DEBUG
-    
-        #occ = self.eigq.get_fermi_function_T0(self.mu)
-        #occ = einsum('skn,t->sknt', occ, ones(1))
+        # nkpt, nband
+        occ = occ[0,:,:,0]
 
-        # nkpt, nband, nband
-        delta_E = (einsum('ij,k->ijk', self.eig0.EIG[0,:,:].real, ones(nband))
-                 - einsum('ij,k->ikj', self.eigq.EIG[0,:,:].real, ones(nband))
-                 - einsum('ij,k->ijk', ones((nkpt,nband)), (2*occ-1)) * self.smearing * 1j)
-    
-        # nmode
-        omega_q = self.ddb.omega[:].real
-    
-        # nband
-        num1 = 1.0 - occ
-        num2 = occ
-    
-        # nkpt, nband, nband, nmode
-        deno1 = (einsum('knm,o->knmo', delta_E, ones(3*natom))
-               - einsum('knm,o->knmo', ones((nkpt,nband,nband)), omega_q))
-    
-        # nmode, nband, nkpt, nband
-        div1 = einsum('m,knmo->omkn', num1, 1.0 / deno1)
-    
-        # nkpt, nband, nband, nmode
-        deno2 = (einsum('knm,o->knmo', delta_E, ones(3*natom))
-               + einsum('knm,o->knmo', ones((nkpt,nband,nband)), omega_q))
-    
-        # nmode, nband, nkpt, nband
-        div2 = einsum('m,knmo->omkn', num2, 1.0 / deno2)
+        # FIXME Here we need the occ at k
+        #       But these are the occ at k+q
+        #       (important for metals)
+        # nkpt, nband
+        eta = (2 * occ - 1) * self.smearing * 1j
     
         # nkpt, nband
-        fan_active = einsum('knmo,omkn->kn', fan_num, div1 + div2)
+        num1 = 1.0 - occ
+        num2 = occ
+
+
+        # nkpt, nband
+        fan_active = zeros((nkpt, nband), dtype=complex)
+
+        for jband in range(nband):
+
+            # nkpt, nband
+            delta_E = (
+                  self.eig0.EIG[0,:,:].real
+                - einsum('k,n->kn', self.eigq.EIG[0,:,jband].real, ones(nband))
+                - eta)
+
+
+
+
+    
+            # nkpt, nband, nmode
+            deno1 = (einsum('kn,o->kno', delta_E, ones(nmode))
+                   - einsum('kn,o->kno', ones((nkpt,nband)), omega_q))
+    
+            # nmode, nband, nkpt, nband
+            div1 = einsum('k,kno->okn', num1[:,jband], 1.0 / deno1)
+
+            del deno1
+    
+            # nkpt, nband, nband, nmode
+            deno2 = (einsum('kn,o->kno', delta_E, ones(nmode))
+                   + einsum('kn,o->kno', ones((nkpt,nband)), omega_q))
+    
+            # nmode, nkpt, nband
+            div2 = einsum('k,kno->okn', num2[:,jband], 1.0 / deno2)
+
+            del deno2
+    
+
+
+
+
+            # nkpt, nband
+            fan_active += einsum('kno,okn->kn', fan_g2[:,:,jband,:], div1 + div2)
+
+            del div1, div2
     
         # FIXME I dont get the same result here....
         tmp_fan_active, ddw_active = self.get_fan_ddw_active(mode=False, temperature=False, omega=False, dynamical=True)
