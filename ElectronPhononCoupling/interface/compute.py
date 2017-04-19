@@ -211,7 +211,7 @@ def compute(
             else:
                 epc.compute_dynamical_zp_broadening()
 
-    elif not dynamical and not split_active:
+    elif not dynamical and split_active:
 
         if renormalization:
 
@@ -227,21 +227,21 @@ def compute(
             else:
                 epc.compute_static_zp_broadening()
 
-    elif not dynamical and split_active:
+    elif not dynamical and not split_active:
 
         if renormalization:
 
             if temperature:
-                epc.compute_static_control_td_renormalization()
+                epc.compute_static_td_renormalization_nosplit()
             else:
-                epc.compute_static_control_zp_renormalization()
+                epc.compute_static_zp_renormalization_nosplit()
 
         if broadening:
 
             if temperature:
-                epc.compute_static_control_td_broadening()
+                epc.compute_static_td_broadening_nosplit()
             else:
-                epc.compute_static_control_zp_broadening()
+                epc.compute_static_zp_broadening_nosplit()
 
 
     # Write the files

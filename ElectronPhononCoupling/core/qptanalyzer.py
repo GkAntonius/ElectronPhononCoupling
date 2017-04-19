@@ -204,7 +204,7 @@ class QptAnalyzer(object):
 
         return fan, ddw
     
-    def get_fan_ddw_active(self):
+    def get_fan_ddw_gkk2_active(self):
         """
         Compute the squared gkk elements for the fan ddw terms.
 
@@ -239,7 +239,7 @@ class QptAnalyzer(object):
         return fan, ddw
     
 
-    def get_zpr_static(self):
+    def get_zpr_static_sternheimer(self):
         """Compute the q-point zpr contribution in a static scheme."""
     
         # First index is to separate zpr, fan, ddw
@@ -258,7 +258,7 @@ class QptAnalyzer(object):
     
         return self.zpr
 
-    def get_zpr_static_active(self):
+    def get_zpr_static(self):
         """
         Compute the q-point zpr contribution in a static scheme,
         with the transitions split between active and sternheimer.
@@ -276,82 +276,21 @@ class QptAnalyzer(object):
         ddw_active  = zeros((nkpt, nband), dtype=complex)
       
         # Sternheimer contribution
+        # ------------------------
       
         # nmode, nkpt, nband
         fan_stern, ddw_stern = self.get_fan_ddw_sternheimer()
       
         fan_term = np.sum(fan_stern, axis=0)
         ddw_term = np.sum(ddw_stern, axis=0)
+
+        del fan_stern, ddw_stern
       
         # Active space contribution
+        # -------------------------
       
         # nkpt, nband, nband, nmode
-        fan_num, ddw_num = self.get_fan_ddw_active()
-
-        # nkpt, nband, nband
-        fan_tmp = np.sum(fan_num, axis=3)
-        ddw_tmp = np.sum(ddw_num, axis=3)
-      
-        # nkpt, nband, nband
-        delta_E = (einsum('ij,k->ijk', self.eig0.EIG[0,:,:].real, ones(nband))
-                 - einsum('ij,k->ikj', self.eigq.EIG[0,:,:].real, ones(nband)))
-    
-        # nkpt, nband, nband
-        delta_E_ddw = (einsum('ij,k->ijk', self.eig0.EIG[0,:,:].real, ones(nband))
-                     - einsum('ij,k->ikj', self.eig0.EIG[0,:,:].real, ones(nband)))
-    
-        # nkpt, nband, nband
-        div =  delta_E / (delta_E ** 2 + self.smearing ** 2)
-    
-        # nkpt, nband
-        fan_active = einsum('ijk,ijk->ij', fan_tmp, div)
-    
-        # nkpt, nband, nband
-        div_ddw = delta_E_ddw / (delta_E_ddw ** 2 + self.smearing ** 2)
-    
-        # nkpt, nband
-        ddw_active = einsum('ijk,ijk->ij', ddw_tmp, div_ddw)
-    
-      
-        # Correction from active space 
-        fan_term += fan_active
-        ddw_term += ddw_active
-    
-        self.zpr = (fan_term - ddw_term) * self.wtq
-    
-        self.zpr = self.eig0.make_average(self.zpr)
-      
-        return self.zpr
-
-    def get_zpr_static_active(self):
-        """
-        Compute the q-point zpr contribution in a static scheme,
-        with the transitions split between active and sternheimer.
-        """
-    
-        nkpt = self.eigr2d.nkpt
-        nband = self.eigr2d.nband
-        natom = self.eigr2d.natom
-      
-        self.zpr = zeros((nkpt, nband), dtype=complex)
-      
-        fan_term = zeros((nkpt, nband), dtype=complex)
-        ddw_term = zeros((nkpt, nband), dtype=complex)
-        fan_active  = zeros((nkpt, nband), dtype=complex)
-        ddw_active  = zeros((nkpt, nband), dtype=complex)
-      
-        # Sternheimer contribution
-      
-        # nmode, nkpt, nband
-        fan_stern, ddw_stern = self.get_fan_ddw_sternheimer()
-      
-        fan_term = np.sum(fan_stern, axis=0)
-        ddw_term = np.sum(ddw_stern, axis=0)
-      
-        # Active space contribution
-      
-        # nkpt, nband, nband, nmode
-        fan_num, ddw_num = self.get_fan_ddw_active()
+        fan_num, ddw_num = self.get_fan_ddw_gkk2_active()
 
         # nkpt, nband, nband
         fan_tmp = np.sum(fan_num, axis=3)
@@ -406,17 +345,21 @@ class QptAnalyzer(object):
         ddw_active  = zeros((nkpt, nband), dtype=complex)
       
         # Sternheimer contribution
+        # ------------------------
       
         # nmode, nkpt, nband
         fan_stern, ddw_stern = self.get_fan_ddw_sternheimer()
       
         fan_term = np.sum(fan_stern, axis=0)
         ddw_term = np.sum(ddw_stern, axis=0)
+
+        del fan_stern, ddw_stern
       
         # Active space contribution
+        # -------------------------
       
         # nkpt, nband, nband, nmode
-        fan_num, ddw_num = self.get_fan_ddw_active()
+        fan_num, ddw_num = self.get_fan_ddw_gkk2_active()
     
         # nkpt, nband, nband
         ddw_tmp = np.sum(ddw_num, axis=3)
@@ -463,8 +406,10 @@ class QptAnalyzer(object):
         # nkpt, nband
         fan_active = einsum('ijkl,lkij->ij', fan_num, div1 + div2)
     
-      
-        # Correction from active space 
+
+        # Summing Sternheimer and active space contributions
+        # --------------------------------------------------
+
         fan_term += fan_active
         ddw_term += ddw_active
     
@@ -495,7 +440,7 @@ class QptAnalyzer(object):
         fan_add  = zeros((nkpt,nband), dtype=complex)
       
         # nkpt, nband, nband, nmode
-        fan_num, ddw_num = self.get_fan_ddw_active()
+        fan_num, ddw_num = self.get_fan_ddw_gkk2_active()
       
         # nkpt, nband, nband
         delta_E = (einsum('ij,k->ijk', self.eig0.EIG[0,:,:].real, ones(nband))
@@ -525,13 +470,12 @@ class QptAnalyzer(object):
         # nkpt, nband
         fan_add = einsum('ijkl,lkij->ij', fan_num, deltas)
 
-        # Correction from active space 
         self.zpb = fan_add * self.wtq
         self.zpb = self.eig0.make_average(self.zpb)
       
         return self.zpb
 
-    def get_zpb_static_active(self):
+    def get_zpb_static(self):
         """
         Compute the zp broadening contribution from one q-point in a static scheme.
         Only take the active space contribution.
@@ -552,7 +496,7 @@ class QptAnalyzer(object):
         fan_add  = zeros((nkpt,nband), dtype=complex)
     
         # nkpt, nband, nband, nmode
-        fan_num, ddw_num = self.get_fan_ddw_active()
+        fan_num, ddw_num = self.get_fan_ddw_gkk2_active()
       
         # nkpt, nband, nband
         delta_E = (einsum('ij,k->ijk', self.eig0.EIG[0,:,:].real, ones(nband))
@@ -570,37 +514,9 @@ class QptAnalyzer(object):
         # nkpt, nband
         fan_add = einsum('ijkl,kij->ij', fan_num, deltasign)
       
-        # Correction from active space 
         self.zpb = fan_add * self.wtq
         self.zpb = self.eig0.make_average(self.zpb)
       
-        return self.zpb
-
-    def get_zpb_static(self):
-        """
-        Compute the zp broadening contribution from one q-point in a static scheme
-        from the EIGI2D files.
-        """
-    
-        nkpt = self.nkpt
-        nband = self.nband
-        natom = self.natom
-    
-        self.zpb = zeros((nkpt, nband), dtype=complex)
-    
-        # Get reduced displacement (scaled with frequency)
-        displ_red_FAN2, displ_red_DDW2 = self.ddb.get_reduced_displ_squared()
-        
-        fan_corrQ = einsum('ijklmn,olnkm->oij', self.eigi2d.EIG2D, displ_red_FAN2)
-    
-        self.zpb += np.pi * np.sum(fan_corrQ, axis=0)
-        self.zpb = self.zpb * self.wtq
-    
-        if np.any(self.zpb[:,:].imag > tol12):
-          warnings.warn("The real part of the broadening is non zero: {}".format(broadening))
-    
-        self.zpb = self.eig0.make_average(self.zpb)
-    
         return self.zpb
 
     def get_zp_self_energy(self):
@@ -632,19 +548,27 @@ class QptAnalyzer(object):
         ddw_add  = zeros((nkpt, nband), dtype=complex)
       
         # Sternheimer contribution
+        # ------------------------
       
         # nmode, nkpt, nband
         fan_stern, ddw_stern = self.get_fan_ddw_sternheimer()
+
+        # nmode, nomega, nkpt, nband
         fan_stern = einsum('okn,l->olkn', fan_stern, ones(nomegase))
       
-        # Sum Sternheimer (upper) contribution
+        # nomega, nkpt, nband
         fan_term = np.sum(fan_stern, axis=0)
+
+        # nkpt, nband
         ddw_term = np.sum(ddw_stern, axis=0)
       
+        del fan_stern, ddw_stern
+      
         # Active space contribution
+        # -------------------------
       
         # nkpt, nband, nband, nmode
-        fan_num, ddw_num = self.get_fan_ddw_active()
+        fan_num, ddw_num = self.get_fan_ddw_gkk2_active()
     
         # nkpt, nband, nband
         ddw_tmp = np.sum(ddw_num, axis=3)
@@ -705,7 +629,9 @@ class QptAnalyzer(object):
             del div1, div2
       
     
-        # Correction from active space 
+        # Summing Sternheimer and active space contributions
+        # --------------------------------------------------
+      
         fan_term += fan_add
         ddw_term += ddw_add
         ddw_term = einsum('kn,l->lkn', ddw_term, ones(nomegase))
@@ -751,15 +677,16 @@ class QptAnalyzer(object):
         fan_add  = zeros((nomegase, nkpt,nband), dtype=complex)
         ddw_add  = zeros((nkpt, nband), dtype=complex)
       
-        # ==== Sternheimer contribution ==== #
+        # Sternheimer contribution
+        # ------------------------
       
         # nmode, nkpt, nband
         fan_stern, ddw_stern = self.get_fan_ddw_sternheimer()
+
+        # nmode, nomega, nkpt, nband
         fan_stern = einsum('okn,l->olkn', fan_stern, ones(nomegase))
       
-        # Sum Sternheimer (upper) contribution
-
-        # nomegae, nkpt, nband
+        # nomega, nkpt, nband
         fan_term = np.sum(fan_stern, axis=0)
 
         # nomegase, ntemp, nkpt, nband
@@ -768,10 +695,13 @@ class QptAnalyzer(object):
         # nkpt, nband, nmode
         ddw_term = einsum('okn->kno', ddw_stern)
       
-        # ==== Active space contribution ==== #
+        del fan_stern, ddw_stern
+      
+        # Active space contribution
+        # -------------------------
       
         # nkpt, nband, nband, nmode
-        fan_num, ddw_num = self.get_fan_ddw_active()
+        fan_num, ddw_num = self.get_fan_ddw_gkk2_active()
     
         # nspin, nkpt, nband, ntemp
         occ = self.eigq.get_fermi_function(self.mu, self.temperatures)
@@ -842,7 +772,9 @@ class QptAnalyzer(object):
             del div1, div2
       
     
-        # Correction from active space 
+        # Summing Sternheimer and active space contributions
+        # --------------------------------------------------
+      
         fan_term += fan_add
         ddw_term += ddw_add
 
@@ -862,36 +794,6 @@ class QptAnalyzer(object):
         return self.sigma
 
     def get_tdr_static(self):
-        """
-        Compute the q-point contribution to the temperature-dependent
-        renormalization in a static scheme.
-        """
-    
-        # These indicies be swapped at the end
-        self.tdr = zeros((self.ntemp, self.eigr2d.nkpt, self.eigr2d.nband), dtype=complex)
-    
-        bose = self.ddb.get_bose(self.temperatures)
-    
-        fan_term = zeros((self.ntemp, self.eigr2d.nkpt, self.eigr2d.nband), dtype=complex)
-        ddw_term = zeros((self.ntemp, self.eigr2d.nkpt, self.eigr2d.nband), dtype=complex)
-    
-        # nmode, nkpt, nband
-        fan_stern, ddw_stern = self.get_fan_ddw_sternheimer()
-      
-        fan_term = einsum('ijk,il->ljk', fan_stern, 2*bose+1.)
-        ddw_term = einsum('ijk,il->ljk', ddw_stern, 2*bose+1.)
-    
-        self.tdr = (fan_term - ddw_term) * self.wtq
-    
-        self.tdr = self.eig0.make_average(self.tdr)
-
-        # nkpt, nband, ntemp
-        self.tdr = np.einsum('kij->ijk', self.tdr)
-    
-        return self.tdr
-
-
-    def get_tdr_static_active(self):
         """
         Compute the q-point contribution to the temperature-dependent
         renormalization in a static scheme,
@@ -914,15 +816,21 @@ class QptAnalyzer(object):
         ddw_add = zeros((ntemp, nkpt, nband),dtype=complex)
     
         # Sternheimer contribution
+        # ------------------------
       
         # nmode, nkpt, nband
         fan_stern, ddw_stern = self.get_fan_ddw_sternheimer()
       
+        # ntemp, nkpt, nband
         fan_term = einsum('ijk,il->ljk', fan_stern, 2*bose+1.0)
         ddw_term = einsum('ijk,il->ljk', ddw_stern, 2*bose+1.0)
     
+        del fan_stern, ddw_stern
+      
         # Active space contribution
-        fan_num, ddw_num = self.get_fan_ddw_active()
+        # ------------------------
+
+        fan_num, ddw_num = self.get_fan_ddw_gkk2_active()
     
         # ikpt,iband,jband      
         delta_E = (einsum('ij,k->ijk', self.eig0.EIG[0,:,:].real, ones(nband)) -
@@ -988,15 +896,21 @@ class QptAnalyzer(object):
         ddw_add = zeros((ntemp, nkpt, nband),dtype=complex)
     
         # Sternheimer contribution
+        # ------------------------
       
         # nmode, nkpt, nband
         fan_stern, ddw_stern = self.get_fan_ddw_sternheimer()
       
+        # ntemp, nkpt, nband
         fan_term = einsum('ijk,il->ljk', fan_stern, 2*bose+1.0)
         ddw_term = einsum('ijk,il->ljk', ddw_stern, 2*bose+1.0)
     
+        del fan_stern, ddw_stern
+      
         # Active space contribution
-        fan_num, ddw_num = self.get_fan_ddw_active()
+        # -------------------------
+
+        fan_num, ddw_num = self.get_fan_ddw_gkk2_active()
     
         # jband
         occ = self.get_occ_nospin()
@@ -1092,7 +1006,7 @@ class QptAnalyzer(object):
 
         return self.tdb
 
-    def get_zpr_static_active_modes(self):
+    def get_zpr_static_modes(self):
         """
         Compute the q-point zpr contribution in a static scheme,
         with the transitions split between active and sternheimer.
@@ -1112,6 +1026,7 @@ class QptAnalyzer(object):
         ddw_active  = zeros((nmode, nkpt, nband), dtype=complex)
       
         # Sternheimer contribution
+        # ------------------------
       
         # nmode, nkpt, nband
         fan_stern, ddw_stern = self.get_fan_ddw_sternheimer()
@@ -1120,9 +1035,10 @@ class QptAnalyzer(object):
         #ddw_term = np.sum(ddw_stern, axis=0)
       
         # Active space contribution
+        # -------------------------
       
         # nkpt, nband, nband, nmode
-        fan_num, ddw_num = self.get_fan_ddw_active()
+        fan_num, ddw_num = self.get_fan_ddw_gkk2_active()
 
         # nmode, nkpt, nband, nband
         fan_tmp = einsum('ijkl->lijk', fan_num)
@@ -1160,4 +1076,60 @@ class QptAnalyzer(object):
         self.zpr = self.eig0.make_average(self.zpr)
       
         return self.zpr
+
+    def get_zpb_static_nosplit(self):
+        """
+        Compute the zp broadening contribution from one q-point in a static scheme
+        from the EIGI2D files.
+        """
+    
+        nkpt = self.nkpt
+        nband = self.nband
+        natom = self.natom
+    
+        self.zpb = zeros((nkpt, nband), dtype=complex)
+    
+        # Get reduced displacement (scaled with frequency)
+        displ_red_FAN2, displ_red_DDW2 = self.ddb.get_reduced_displ_squared()
+        
+        fan_corrQ = einsum('ijklmn,olnkm->oij', self.eigi2d.EIG2D, displ_red_FAN2)
+    
+        self.zpb += np.pi * np.sum(fan_corrQ, axis=0)
+        self.zpb = self.zpb * self.wtq
+    
+        if np.any(self.zpb[:,:].imag > tol12):
+          warnings.warn("The real part of the broadening is non zero: {}".format(broadening))
+    
+        self.zpb = self.eig0.make_average(self.zpb)
+    
+        return self.zpb
+
+    def get_tdr_static_nosplit(self):
+        """
+        Compute the q-point contribution to the temperature-dependent
+        renormalization in a static scheme.
+        """
+    
+        # These indicies be swapped at the end
+        self.tdr = zeros((self.ntemp, self.eigr2d.nkpt, self.eigr2d.nband), dtype=complex)
+    
+        bose = self.ddb.get_bose(self.temperatures)
+    
+        fan_term = zeros((self.ntemp, self.eigr2d.nkpt, self.eigr2d.nband), dtype=complex)
+        ddw_term = zeros((self.ntemp, self.eigr2d.nkpt, self.eigr2d.nband), dtype=complex)
+    
+        # nmode, nkpt, nband
+        fan_stern, ddw_stern = self.get_fan_ddw_sternheimer()
+      
+        fan_term = einsum('ijk,il->ljk', fan_stern, 2*bose+1.)
+        ddw_term = einsum('ijk,il->ljk', ddw_stern, 2*bose+1.)
+    
+        self.tdr = (fan_term - ddw_term) * self.wtq
+    
+        self.tdr = self.eig0.make_average(self.tdr)
+
+        # nkpt, nband, ntemp
+        self.tdr = np.einsum('kij->ijk', self.tdr)
+    
+        return self.tdr
 

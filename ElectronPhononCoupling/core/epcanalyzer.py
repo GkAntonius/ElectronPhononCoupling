@@ -21,9 +21,9 @@ __all__ = ['EpcAnalyzer']
 
 class EpcAnalyzer(object):
     """
-    Main class for analysing electron-phonon coupling related quantities.
+    Main class for analyzing electron-phonon coupling related quantities.
 
-    It is intented to analyse the files produced by ABINIT
+    It is intented to analyze the files produced by ABINIT
     in a phonon response-function calculation, with one q-point per dataset,
     the first q-point being Gamma.
 
@@ -58,8 +58,20 @@ class EpcAnalyzer(object):
     my_iqpts = [0]
 
     def __init__(self,
+                 # Options
+                 asr=True,
+                 fermi_level = None,
+                 verbose=False,
+
+                 # Parameters
                  nqpt=1,
                  wtq=[1.0],
+                 temp_range=[0,0,1],
+                 omega_range=[0,0,1],
+                 smearing=0.00367,
+
+                 # File names
+                 rootname='epc.out',
                  eigk_fname='',
                  eigq_fnames=list(),
                  ddb_fnames=list(),
@@ -67,13 +79,6 @@ class EpcAnalyzer(object):
                  eigi2d_fnames=list(),
                  fan_fnames=list(),
                  gkk_fnames=list(),
-                 rootname='epc.out',
-                 temp_range=[0,0,1],
-                 omega_range=[0,0,1],
-                 smearing=0.00367,
-                 asr=True,
-                 fermi_level = None,
-                 verbose=False,
                  **kwargs):
 
         # Check that the minimum number of files is present
@@ -479,18 +484,18 @@ class EpcAnalyzer(object):
 
         return qred, omega
 
-    def compute_static_zp_renormalization(self):
+    def compute_static_zp_renormalization_nosplit(self):
         """Compute the zero-point renormalization in a static scheme."""
-        self.zero_point_renormalization = self.sum_qpt_function('get_zpr_static')
+        self.zero_point_renormalization = self.sum_qpt_function('get_zpr_static_sternheimer')
         self.renormalization_is_dynamical = False
 
-    def compute_static_td_renormalization(self):
+    def compute_static_td_renormalization_nosplit(self):
         """
         Compute the temperature-dependent renormalization in a static scheme.
         """
         self.check_temperatures()
         self.temperature_dependent_renormalization = self.sum_qpt_function(
-            'get_tdr_static')
+            'get_tdr_static_nosplit')
         self.renormalization_is_dynamical = False
 
     def compute_dynamical_td_renormalization(self):
@@ -508,26 +513,26 @@ class EpcAnalyzer(object):
             'get_zpr_dynamical')
         self.renormalization_is_dynamical = True
 
-    def compute_static_control_td_renormalization(self):
+    def compute_static_td_renormalization(self):
         """
         Compute the temperature-dependent renormalization in a static scheme
         with the transitions split between active and sternheimer.
         """
         self.check_temperatures()
         self.temperature_dependent_renormalization = self.sum_qpt_function(
-            'get_tdr_static_active')
+            'get_tdr_static')
         self.renormalization_is_dynamical = False
 
-    def compute_static_control_zp_renormalization(self):
+    def compute_static_zp_renormalization(self):
         """
         Compute the zero-point renormalization in a static scheme
         with the transitions split between active and sternheimer.
         """
         self.zero_point_renormalization = self.sum_qpt_function(
-            'get_zpr_static_active')
+            'get_zpr_static')
         self.renormalization_is_dynamical = False
 
-    def compute_static_td_broadening(self):
+    def compute_static_td_broadening_nosplit(self):
         """
         Compute the temperature-dependent broadening in a static scheme
         from the EIGI2D files.
@@ -537,13 +542,13 @@ class EpcAnalyzer(object):
             'get_tdb_static')
         self.broadening_is_dynamical = False
 
-    def compute_static_zp_broadening(self):
+    def compute_static_zp_broadening_nosplit(self):
         """
         Compute the zero-point broadening in a static scheme
         from the EIGI2D files.
         """
         self.zero_point_broadening = self.sum_qpt_function(
-            'get_zpb_static')
+            'get_zpb_static_nosplit')
         self.broadening_is_dynamical = False
 
     def compute_dynamical_td_broadening(self):
@@ -551,7 +556,7 @@ class EpcAnalyzer(object):
         warnings.warn(
         'Dynamical lifetime at finite temperature is not yet implemented...'
         'proceed with static lifetime')
-        return self.compute_static_td_broadening()
+        return self.compute_static_td_broadening_nosplit()
 
     def compute_dynamical_zp_broadening(self):
         """
@@ -561,29 +566,29 @@ class EpcAnalyzer(object):
             'get_zpb_dynamical')
         self.broadening_is_dynamical = True
 
-    def compute_static_control_td_broadening(self):
+    def compute_static_td_broadening(self):
         self.check_temperatures()
         warnings.warn('Static lifetime at finite temperature '
                       'with control over smearing is not yet implemented...'
                       'proceed with static lifetime')
-        return self.compute_static_td_broadening()
+        return self.compute_static_td_broadening_nosplit()
 
-    def compute_static_control_zp_broadening(self):
+    def compute_static_zp_broadening(self):
         """
         Compute the zero-point broadening in a static scheme
         from the FAN files.
         """
-        self.zero_point_broadening = self.sum_qpt_function('get_zpb_static_active')
+        self.zero_point_broadening = self.sum_qpt_function('get_zpb_static')
         self.broadening_is_dynamical = False
 
-    def compute_static_control_zp_renormalization_modes(self):
+    def compute_static_zp_renormalization_modes(self):
         """
         Compute the zero-point renormalization in a static scheme
         with the transitions split between active and sternheimer.
         Retain the mode decomposition of the zpr.
         """
 
-        self.zero_point_renormalization_modes = self.sum_qpt_function('get_zpr_static_active_modes')
+        self.zero_point_renormalization_modes = self.sum_qpt_function('get_zpr_static_modes')
         self.renormalization_is_dynamical = False
 
     def compute_zp_self_energy(self):
