@@ -370,16 +370,16 @@ class QptAnalyzer(object):
         # ntemp
         bose = self.ddb.get_bose(temperatures)
 
+        if temperature:
+            n_B = bose
+        else:
+            n_B = zeros((nmode,1))
+
+
         # Fermi-Dirac occupation number
         # nspin, nkpt, nband, ntemp
         occ = self.eigq.get_fermi_function(self.mu, temperatures)
 
-        # FIXME Here we need the occ at k
-        #       But these are the occ at k+q
-        #       (important for metals)
-        # nband
-        occ0 = self.get_occ_nospin()
-    
         # G^2
         # nkpt, nband, nband, nmode
         fan_g2, ddw_g2 = self.get_fan_ddw_gkk2_active()
@@ -388,6 +388,12 @@ class QptAnalyzer(object):
         # DDW term
         # --------
 
+        # FIXME Here we need the occ at k
+        #       But these are the occ at k+q
+        #       (important for metals)
+        # nband
+        occ0 = self.get_occ_nospin()
+    
         # nkpt, nband, nband
         delta_E_ddw = (einsum('kn,m->knm', self.eig0.EIG[0,:,:].real, ones(nband))
                      - einsum('kn,m->kmn', self.eig0.EIG[0,:,:].real, ones(nband))
@@ -397,7 +403,7 @@ class QptAnalyzer(object):
         ddw = einsum('knmo,knm->okn', ddw_g2, 1.0 / delta_E_ddw)
 
         # nmode, ntemp
-        tdep = 2 * bose + 1 if temperature else ones((nmode, ntemp))
+        tdep = 2 * bose + 1
 
         # FIXME This is not optimal: The mode indices will be summed
         #       so there is no need to create an array this big.
@@ -421,20 +427,13 @@ class QptAnalyzer(object):
         # nmode, ntemp, nomegase, nkpt, nband
         fan = zeros((nmode, ntemp, nomegase, nkpt, nband), dtype=complex)
 
-        if temperature:
-            n_B = bose
-        else:
-            n_B = zeros((nmode,1))
-
-        # FIXME These should be the occ at k+q
-        # nkpt, nband, nmode, ntemp
         # n + 1 - f
+        # nkpt, nband, nmode, ntemp
         num1 = (einsum('ot,kn->knot', n_B, ones((nkpt,nband)))
               + 1. - einsum('knt,o->knot', occ[0,:,:,:], ones(nmode)))
 
-        # FIXME These should be the occ at k+q
-        # nkpt, nband, nmode, ntemp
         # n + f
+        # nkpt, nband, nmode, ntemp
         num2 = (einsum('ot,kn->knot', n_B, ones((nkpt,nband)))
               + einsum('knt,o->knot', occ[0,:,:,:], ones(nmode)))
 
@@ -443,11 +442,6 @@ class QptAnalyzer(object):
         eta = (2 * occ[0,:,:,0] - 1) * self.smearing * 1j
 
         for jband in range(nband):
-
-            # FIXME These should be the occ at k, not at k+q
-            # nkpt, nband
-            #eta = (ones((nkpt,nband)) * (2 * occ0[jband] - 1)
-            #       * self.smearing * 1j)
 
             # nkpt, nband
             delta_E = (
@@ -464,7 +458,7 @@ class QptAnalyzer(object):
                    - einsum('knl,o->knlo', ones((nkpt,nband,nomegase)), omega_q))
 
             # nmode, nkpt, nband, nomegase, ntemp
-            div1 = einsum('knot,knlo->oknlt', num1, 1.0 / deno1)
+            div1 = einsum('kot,knlo->oknlt', num1[:,jband,:,:], 1.0 / deno1)
     
             del deno1
     
@@ -473,7 +467,7 @@ class QptAnalyzer(object):
                    + einsum('knl,o->knlo', ones((nkpt,nband,nomegase)), omega_q))
     
             # nmode, nkpt, nband, nomegase, ntemp
-            div2 = einsum('knot,knlo->oknlt', num2, 1.0 / deno2)
+            div2 = einsum('kot,knlo->oknlt', num2[:,jband,:,:], 1.0 / deno2)
 
             del deno2
     
@@ -561,30 +555,40 @@ class QptAnalyzer(object):
       
         # Active space contribution
         # -------------------------
+
+        nomegase = 1
+        omega_se = zeros(1)
+        ntemp = 1
+        temperatures = zeros(1)
+        n_B = zeros((nmode,1))
       
         # nkpt, nband, nband, nmode
         fan_g2, ddw_g2 = self.get_fan_ddw_gkk2_active()
     
+        # Fermi-Dirac occupation number
         # nspin, nkpt, nband, ntemp
-        occ = self.eigq.get_fermi_function(self.mu, zeros(1))
+        occ = self.eigq.get_fermi_function(self.mu, temperatures)
 
         # nkpt, nband
-        occ = occ[0,:,:,0]
-
-        # FIXME Here we need the occ at k
-        #       But these are the occ at k+q
-        #       (important for metals)
-        # nkpt, nband
-        eta = (2 * occ - 1) * self.smearing * 1j
-    
-        # nkpt, nband
-        num1 = 1.0 - occ
-        num2 = occ
-
+        #occ = occ[0,:,:,0]
 
         # nkpt, nband
         fan_active = zeros((nkpt, nband), dtype=complex)
 
+        # n + 1 - f
+        # nkpt, nband, nmode, ntemp
+        num1 = (einsum('ot,kn->knot', n_B, ones((nkpt,nband)))
+              + 1. - einsum('knt,o->knot', occ[0,:,:,:], ones(nmode)))
+
+        # n + f
+        # nkpt, nband, nmode, ntemp
+        num2 = (einsum('ot,kn->knot', n_B, ones((nkpt,nband)))
+              + einsum('knt,o->knot', occ[0,:,:,:], ones(nmode)))
+
+        # FIXME These should be the occ at k
+        # nkpt, nband
+        eta = (2 * occ[0,:,:,0] - 1) * self.smearing * 1j
+    
         for jband in range(nband):
 
             # nkpt, nband
@@ -594,38 +598,60 @@ class QptAnalyzer(object):
                 - eta)
 
 
-
-
+            # nkpt, nband, nomegase
+            delta_E_omega = (einsum('kn,l->knl', delta_E, ones(nomegase))
+                           + einsum('kn,l->knl', ones((nkpt,nband)), omega_se))
     
+            """
+
+            # nkpt, nband, nomegase, nmode
+            deno1 = (einsum('knl,o->knlo', delta_E_omega, ones(nmode))
+                   - einsum('knl,o->knlo', ones((nkpt,nband,nomegase)), omega_q))
+
+            # nmode, nkpt, nband, nomegase, ntemp
+            div1 = einsum('knot,knlo->oknlt', num1, 1.0 / deno1)
+    
+            # nkpt, nband, nomegase, nmode
+            deno2 = (einsum('knl,o->knlo', delta_E_omega, ones(nmode))
+                   + einsum('knl,o->knlo', ones((nkpt,nband,nomegase)), omega_q))
+    
+            # nmode, nkpt, nband, nomegase, ntemp
+            div2 = einsum('knot,knlo->oknlt', num2, 1.0 / deno2)
+
+            # nmode, ntemp, nomegase, nkpt, nband
+            fan_active_j = einsum('kno,oknlt->otlkn', fan_g2[:,:,jband,:], div1 + div2)
+    
+            fan_active_j = einsum('otlkn->kn', fan_active_j)
+    
+            """
             # nkpt, nband, nmode
-            deno1 = (einsum('kn,o->kno', delta_E, ones(nmode))
-                   - einsum('kn,o->kno', ones((nkpt,nband)), omega_q))
+            deno1 = (einsum('knl,o->kno', delta_E_omega, ones(nmode))
+                   - einsum('knl,o->kno', ones((nkpt,nband,nomegase)), omega_q))
     
             # nmode, nband, nkpt, nband
-            div1 = einsum('k,kno->okn', num1[:,jband], 1.0 / deno1)
+            div1 = einsum('k,kno->okn', num1[:,jband,0,0], 1.0 / deno1)
 
-            del deno1
-    
             # nkpt, nband, nband, nmode
-            deno2 = (einsum('kn,o->kno', delta_E, ones(nmode))
-                   + einsum('kn,o->kno', ones((nkpt,nband)), omega_q))
+            deno2 = (einsum('knl,o->kno', delta_E_omega, ones(nmode))
+                   + einsum('knl,o->kno', ones((nkpt,nband,nomegase)), omega_q))
     
             # nmode, nkpt, nband
-            div2 = einsum('k,kno->okn', num2[:,jband], 1.0 / deno2)
-
-            del deno2
-    
-
-
-
+            div2 = einsum('k,kno->okn', num2[:,jband,0,0], 1.0 / deno2)
 
             # nkpt, nband
-            fan_active += einsum('kno,okn->kn', fan_g2[:,:,jband,:], div1 + div2)
+            fan_active_j = einsum('kno,okn->kn', fan_g2[:,:,jband,:], div1 + div2)
 
-            del div1, div2
+
+
+
+
+
+
+            fan_active += fan_active_j
     
         # FIXME I dont get the same result here....
-        tmp_fan_active, ddw_active = self.get_fan_ddw_active(mode=False, temperature=False, omega=False, dynamical=True)
+        tmp_fan_active, ddw_active = self.get_fan_ddw_active(
+            mode=False, temperature=False, omega=False, dynamical=True)
 
         # Summing Sternheimer and active space contributions
         # --------------------------------------------------
