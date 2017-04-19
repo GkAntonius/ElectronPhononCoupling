@@ -485,10 +485,25 @@ class QptAnalyzer(object):
 
         return fan, ddw
 
-    def get_fan_ddw(self, mode=False, temperature=False, omega=False, dynamical=False):
+    def get_fan_ddw(self, mode=False, temperature=False,
+                    omega=False, dynamical=False):
 
-        fan_stern, ddw_stern = self.get_fan_ddw_sternheimer(mode=False, temperature=False, omega=False)
-        fan_active, ddw_active = self.get_fan_ddw_active(mode=False, temperature=False, omega=False, dynamical=False)
+        kwargs = dict(
+            mode=mode,
+            temperature=temperature,
+            omega=omega,
+            dynamical=dynamical)
+
+        fan_stern, ddw_stern = self.get_fan_ddw_sternheimer(
+            mode=mode,
+            temperature=temperature,
+            omega=omega,
+            )
+        fan_active, ddw_active = self.get_fan_ddw_active(
+            mode=mode,
+            temperature=temperature,
+            omega=omega,
+            dynamical=dynamical)
 
         fan = fan_active + fan_stern
         ddw = ddw_active + ddw_stern
@@ -526,143 +541,13 @@ class QptAnalyzer(object):
         with the transitions split between active and sternheimer.
         """
 
-        # # nkpt, nband
-        # fan, ddw = self.get_fan_ddw(mode=False, temperature=False, omega=False, dynamical=True)
-        # self.zpr = self.wtq * (fan - ddw).real
-        # self.zpr = self.eig0.make_average(self.zpr)
-        # return self.zpr
-    
-
-        nkpt = self.eigr2d.nkpt
-        nband = self.eigr2d.nband
-        nmode = self.nmode
-
-        # nmode
-        omega_q = self.ddb.omega[:].real
-      
-        self.zpr = zeros((nkpt, nband), dtype=complex)
-      
-        fan = zeros((nkpt, nband), dtype=complex)
-        ddw = zeros((nkpt, nband), dtype=complex)
-        fan_active  = zeros((nkpt, nband), dtype=complex)
-        ddw_active  = zeros((nkpt, nband), dtype=complex)
-      
-        # Sternheimer contribution
-        # ------------------------
-      
-        # nmode, nkpt, nband
-        fan_stern, ddw_stern = self.get_fan_ddw_sternheimer(mode=False, temperature=False, omega=False)
-      
-        # Active space contribution
-        # -------------------------
-
-        nomegase = 1
-        omega_se = zeros(1)
-        ntemp = 1
-        temperatures = zeros(1)
-        n_B = zeros((nmode,1))
-      
-        # nkpt, nband, nband, nmode
-        fan_g2, ddw_g2 = self.get_fan_ddw_gkk2_active()
-    
-        # Fermi-Dirac occupation number
-        # nspin, nkpt, nband, ntemp
-        occ = self.eigq.get_fermi_function(self.mu, temperatures)
-
-        # nkpt, nband
-        #occ = occ[0,:,:,0]
-
-        # nkpt, nband
-        fan_active = zeros((nkpt, nband), dtype=complex)
-
-        # n + 1 - f
-        # nkpt, nband, nmode, ntemp
-        num1 = (einsum('ot,kn->knot', n_B, ones((nkpt,nband)))
-              + 1. - einsum('knt,o->knot', occ[0,:,:,:], ones(nmode)))
-
-        # n + f
-        # nkpt, nband, nmode, ntemp
-        num2 = (einsum('ot,kn->knot', n_B, ones((nkpt,nband)))
-              + einsum('knt,o->knot', occ[0,:,:,:], ones(nmode)))
-
-        # FIXME These should be the occ at k
-        # nkpt, nband
-        eta = (2 * occ[0,:,:,0] - 1) * self.smearing * 1j
-    
-        for jband in range(nband):
-
-            # nkpt, nband
-            delta_E = (
-                  self.eig0.EIG[0,:,:].real
-                - einsum('k,n->kn', self.eigq.EIG[0,:,jband].real, ones(nband))
-                - eta)
-
-
-            # nkpt, nband, nomegase
-            delta_E_omega = (einsum('kn,l->knl', delta_E, ones(nomegase))
-                           + einsum('kn,l->knl', ones((nkpt,nband)), omega_se))
-    
-            """
-
-            # nkpt, nband, nomegase, nmode
-            deno1 = (einsum('knl,o->knlo', delta_E_omega, ones(nmode))
-                   - einsum('knl,o->knlo', ones((nkpt,nband,nomegase)), omega_q))
-
-            # nmode, nkpt, nband, nomegase, ntemp
-            div1 = einsum('knot,knlo->oknlt', num1, 1.0 / deno1)
-    
-            # nkpt, nband, nomegase, nmode
-            deno2 = (einsum('knl,o->knlo', delta_E_omega, ones(nmode))
-                   + einsum('knl,o->knlo', ones((nkpt,nband,nomegase)), omega_q))
-    
-            # nmode, nkpt, nband, nomegase, ntemp
-            div2 = einsum('knot,knlo->oknlt', num2, 1.0 / deno2)
-
-            # nmode, ntemp, nomegase, nkpt, nband
-            fan_active_j = einsum('kno,oknlt->otlkn', fan_g2[:,:,jband,:], div1 + div2)
-    
-            fan_active_j = einsum('otlkn->kn', fan_active_j)
-    
-            """
-            # nkpt, nband, nmode
-            deno1 = (einsum('knl,o->kno', delta_E_omega, ones(nmode))
-                   - einsum('knl,o->kno', ones((nkpt,nband,nomegase)), omega_q))
-    
-            # nmode, nband, nkpt, nband
-            div1 = einsum('k,kno->okn', num1[:,jband,0,0], 1.0 / deno1)
-
-            # nkpt, nband, nband, nmode
-            deno2 = (einsum('knl,o->kno', delta_E_omega, ones(nmode))
-                   + einsum('knl,o->kno', ones((nkpt,nband,nomegase)), omega_q))
-    
-            # nmode, nkpt, nband
-            div2 = einsum('k,kno->okn', num2[:,jband,0,0], 1.0 / deno2)
-
-            # nkpt, nband
-            fan_active_j = einsum('kno,okn->kn', fan_g2[:,:,jband,:], div1 + div2)
-
-
-
-
-
-
-
-            fan_active += fan_active_j
-    
-        # FIXME I dont get the same result here....
-        tmp_fan_active, ddw_active = self.get_fan_ddw_active(
+        fan, ddw = self.get_fan_ddw(
             mode=False, temperature=False, omega=False, dynamical=True)
 
-        # Summing Sternheimer and active space contributions
-        # --------------------------------------------------
-
-        fan = fan_stern + fan_active
-        ddw = ddw_stern + ddw_active
-    
         self.zpr = (fan - ddw) * self.wtq
-    
+
         self.zpr = self.eig0.make_average(self.zpr)
-      
+
         return self.zpr
 
     def get_zpb_dynamical(self):
