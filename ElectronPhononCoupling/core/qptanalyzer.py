@@ -185,22 +185,74 @@ class QptAnalyzer(object):
         """
         return (self.get_max_val() + self.get_min_cond()) / 2.0
 
-    def get_fan_ddw_sternheimer(self):
+    def get_fan_ddw_sternheimer(self, mode=False, omega=False, temperature=False):
         """
         Compute the fan and ddw contribution to the self-energy
         obtained from the Sternheimer equation.
 
-        Returns:
-            fan[nmode, nkpt, nband]
-            ddw[nmode, nkpt, nband]
+        Returns: fan, ddw
+
+        The return arrays vary in dimensions, depending on the input arguments.
+        These arrays are at most of dimension 5, as
+
+            fan[nmode, ntemp, nomegase, nkpt, nband]
+            ddw[nmode, ntemp, nomegase, nkpt, nband]
+
+        Depending on the truth value of the input arguments,
+        the dimension nomegase (omega) and ntemp (temperature)
+        will be eliminated. 
+        The dimension nmode will be summed over in case mode=False.
+
+        In the semi-static approximation, these quantities do not actually
+        depend on omega, so the arrays are simply repated along the omega axis.
+
         """
+
+        nkpt = self.nkpt
+        nband = self.nband
+        natom = self.natom
+        nmode = self.nmode
+        nomegase = self.nomegase
+        ntemp = self.ntemp
+
         # Get reduced displacement (scaled with frequency)
         displ_red_FAN2, displ_red_DDW2 = self.ddb.get_reduced_displ_squared()
-
+    
+        bose = self.ddb.get_bose(self.temperatures)
+    
         # FIXME this will not work for nsppol=2
         # nmode, nkpt, nband
-        fan = einsum('ijklmn,olnkm->oij', self.eigr2d.EIG2D, displ_red_FAN2)
-        ddw = einsum('ijklmn,olnkm->oij', self.eigr2d0.EIG2D, displ_red_DDW2)
+        fan = einsum('knabij,objai->okn', self.eigr2d.EIG2D, displ_red_FAN2)
+        ddw = einsum('knabij,objai->okn', self.eigr2d0.EIG2D, displ_red_DDW2)
+
+        # Temperature dependence factor
+        tdep = 2 * bose + 1 if temperature else ones((nmode,1))
+
+        # Omega dependence factor
+        odep = ones(nomegase) if omega else ones(1)
+
+        # nmode, ntemp, nkpt, nband
+        fan = einsum('okn,ot->otkn', fan, tdep)
+        ddw = einsum('okn,ot->otkn', ddw, tdep)
+
+        # nmode, ntemp, nomega, nkpt, nband
+        fan = einsum('otkn,l->otlkn', fan, odep)
+        ddw = einsum('otkn,l->otlkn', ddw, odep)
+
+        # Find the final order of 
+        final_indices = ''
+        if mode:
+            final_indices += 'o'
+        if temperature:
+            final_indices += 't'
+        if omega:
+            final_indices += 'l'
+        final_indices += 'kn'
+
+        summation = 'otlkn->' + final_indices
+
+        fan = einsum(summation, fan)
+        ddw = einsum(summation, ddw)
 
         return fan, ddw
     
@@ -245,14 +297,10 @@ class QptAnalyzer(object):
         # First index is to separate zpr, fan, ddw
         self.zpr = zeros((self.eigr2d.nkpt, self.eigr2d.nband), dtype=complex)
     
-        # nmode, nkpt, nband
-        fan_stern, ddw_stern = self.get_fan_ddw_sternheimer()
+        # nkpt, nband
+        fan, ddw = self.get_fan_ddw_sternheimer(mode=False, omega=False, temperature=False)
     
-        # Sum all modes
-        fan_term = np.sum(fan_stern, axis=0)
-        ddw_term = np.sum(ddw_stern, axis=0)
-    
-        self.zpr = (fan_term - ddw_term) * self.wtq
+        self.zpr = (fan - ddw) * self.wtq
     
         self.zpr = self.eig0.make_average(self.zpr)
     
@@ -279,12 +327,7 @@ class QptAnalyzer(object):
         # ------------------------
       
         # nmode, nkpt, nband
-        fan_stern, ddw_stern = self.get_fan_ddw_sternheimer()
-      
-        fan_term = np.sum(fan_stern, axis=0)
-        ddw_term = np.sum(ddw_stern, axis=0)
-
-        del fan_stern, ddw_stern
+        fan_term, ddw_term = self.get_fan_ddw_sternheimer(mode=False, temperature=False, omega=False)
       
         # Active space contribution
         # -------------------------
@@ -348,12 +391,7 @@ class QptAnalyzer(object):
         # ------------------------
       
         # nmode, nkpt, nband
-        fan_stern, ddw_stern = self.get_fan_ddw_sternheimer()
-      
-        fan_term = np.sum(fan_stern, axis=0)
-        ddw_term = np.sum(ddw_stern, axis=0)
-
-        del fan_stern, ddw_stern
+        fan_term, ddw_term = self.get_fan_ddw_sternheimer(mode=False, temperature=False, omega=False)
       
         # Active space contribution
         # -------------------------
@@ -551,7 +589,7 @@ class QptAnalyzer(object):
         # ------------------------
       
         # nmode, nkpt, nband
-        fan_stern, ddw_stern = self.get_fan_ddw_sternheimer()
+        fan_stern, ddw_stern = self.get_fan_ddw_sternheimer(mode=True, temperature=False, omega=False)
 
         # nmode, nomega, nkpt, nband
         fan_stern = einsum('okn,l->olkn', fan_stern, ones(nomegase))
@@ -658,9 +696,7 @@ class QptAnalyzer(object):
         nkpt = self.nkpt
         nband = self.nband
         natom = self.natom
-    
         nmode = self.nmode
-
         nomegase = self.nomegase
         ntemp = self.ntemp
       
@@ -681,16 +717,16 @@ class QptAnalyzer(object):
         # ------------------------
       
         # nmode, nkpt, nband
-        fan_stern, ddw_stern = self.get_fan_ddw_sternheimer()
+        fan_stern, ddw_stern = self.get_fan_ddw_sternheimer(mode=True, temperature=False, omega=False)
 
         # nmode, nomega, nkpt, nband
         fan_stern = einsum('okn,l->olkn', fan_stern, ones(nomegase))
       
-        # nomega, nkpt, nband
-        fan_term = np.sum(fan_stern, axis=0)
-
         # nomegase, ntemp, nkpt, nband
-        fan_term = einsum('lkn,t->ltkn', fan_term, ones(ntemp))     
+        # FIXME: I think the temperature dependence
+        #        of the Sternheimer part of the Fan term
+        #        is not properly computed
+        fan_term = einsum('olkn,ot->ltkn', fan_stern, 2 * bose + 1)     
 
         # nkpt, nband, nmode
         ddw_term = einsum('okn->kno', ddw_stern)
@@ -819,7 +855,7 @@ class QptAnalyzer(object):
         # ------------------------
       
         # nmode, nkpt, nband
-        fan_stern, ddw_stern = self.get_fan_ddw_sternheimer()
+        fan_stern, ddw_stern = self.get_fan_ddw_sternheimer(mode=True, temperature=False, omega=False)
       
         # ntemp, nkpt, nband
         fan_term = einsum('ijk,il->ljk', fan_stern, 2*bose+1.0)
@@ -899,7 +935,7 @@ class QptAnalyzer(object):
         # ------------------------
       
         # nmode, nkpt, nband
-        fan_stern, ddw_stern = self.get_fan_ddw_sternheimer()
+        fan_stern, ddw_stern = self.get_fan_ddw_sternheimer(mode=True, temperature=False, omega=False)
       
         # ntemp, nkpt, nband
         fan_term = einsum('ijk,il->ljk', fan_stern, 2*bose+1.0)
@@ -1029,7 +1065,7 @@ class QptAnalyzer(object):
         # ------------------------
       
         # nmode, nkpt, nband
-        fan_stern, ddw_stern = self.get_fan_ddw_sternheimer()
+        fan_stern, ddw_stern = self.get_fan_ddw_sternheimer(mode=True, temperature=False, omega=False)
 
         #fan_term = np.sum(fan_stern, axis=0)
         #ddw_term = np.sum(ddw_stern, axis=0)
@@ -1119,7 +1155,7 @@ class QptAnalyzer(object):
         ddw_term = zeros((self.ntemp, self.eigr2d.nkpt, self.eigr2d.nband), dtype=complex)
     
         # nmode, nkpt, nband
-        fan_stern, ddw_stern = self.get_fan_ddw_sternheimer()
+        fan_stern, ddw_stern = self.get_fan_ddw_sternheimer(mode=True, temperature=False, omega=False)
       
         fan_term = einsum('ijk,il->ljk', fan_stern, 2*bose+1.)
         ddw_term = einsum('ijk,il->ljk', ddw_stern, 2*bose+1.)
