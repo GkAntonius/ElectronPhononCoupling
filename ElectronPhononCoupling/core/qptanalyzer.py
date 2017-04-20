@@ -605,7 +605,7 @@ class QptAnalyzer(object):
         # FIXME The sign should depend on the occupation at k, not at k+q.
         #       (won't make a difference for insulators)
         # nkpt, nband
-        sign = - (2 * f[0,0,:,:] - 1.)
+        sign = np.sign(- (2 * f[0,0,:,:] - 1.))
 
         broadening = zeros((nmode,ntemp,nomegase,nkpt,nband))
 
@@ -882,73 +882,8 @@ class QptAnalyzer(object):
         Returns: zpb[nkpt,nband]
         """
 
-        #self.zpb = self.get_broadening(mode=False, temperature=False,
-        #                               omega=False, dynamical=False)
-        #return self.zpb
-
-        nkpt = self.nkpt
-        nband = self.nband
-        natom = self.natom
-
-        # nband
-        occ = self.get_occ_nospin()
-
-        self.zpb = zeros((nkpt, nband), dtype=complex)
-
-        # nmode
-        omega = self.ddb.omega[:].real
-
-        fan_add  = zeros((nkpt,nband), dtype=complex)
-
-        # nkpt, nband, nband, nmode
-        fan_num, ddw_num = self.get_fan_ddw_gkk2_active()
-
-        # nband
-        num = - (2 * occ - 1.)
-
-        """
-        # nkpt, nband, nband
-        delta_E = (einsum('kn,m->knm', self.eig0.EIG[0,:,:].real, ones(nband))
-                 - einsum('km,n->knm', self.eigq.EIG[0,:,:].real, ones(nband)))
-
-        # nkpt, nband, nband
-        delta =  np.pi * delta_lorentzian(delta_E, self.smearing)
-
-        # nband, nkpt, nband
-        deltasign = einsum('m,knm->mkn', num, delta)
-
-        # nkpt, nband
-        fan_add = einsum('knmo,mkn->kn', fan_num, deltasign)
-        """
-
-        for jband in range(nband):
-
-            # nkpt, nband,
-            delta_E = (
-                self.eig0.EIG[0,:,:].real
-                - einsum('k,n->kn', self.eigq.EIG[0,:,jband].real, ones(nband))
-                )
-
-            # nkpt, nband
-            delta =  np.pi * delta_lorentzian(delta_E, self.smearing)
-
-            # FIXME this is a bug, one should take f_kn, but this is f_kqm
-            # nkpt, nband
-            #deltasign = num[jband] * delta
-            deltasign = einsum('n,kn->kn', num, delta)
-
-            # nkpt, nband
-            fan_add += einsum('kno,kn->kn', fan_num[:,:,jband,:], deltasign)
-
-        # DEBUG
-        #print(num)
-        #print(delta_E)
-        #fan_add += 3.0  # Break the test
-        # END DEBUG
-    
-        self.zpb = fan_add * self.wtq
-        self.zpb = self.eig0.make_average(self.zpb)
-      
+        self.zpb = self.get_broadening(mode=False, temperature=False,
+                                       omega=False, dynamical=False)
         return self.zpb
 
     def get_tdb_static(self):
