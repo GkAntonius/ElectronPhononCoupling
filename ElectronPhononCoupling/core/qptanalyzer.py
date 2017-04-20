@@ -231,6 +231,8 @@ class QptAnalyzer(object):
         obtained from the Sternheimer equation,
         that is, the contribution of the upper bands.
 
+        Do not include the q-point weight.
+
         Returns: fan, ddw
 
         The return arrays vary in dimensions, depending on the input arguments.
@@ -258,15 +260,14 @@ class QptAnalyzer(object):
         # Get reduced displacement (scaled with frequency)
         displ_red_FAN2, displ_red_DDW2 = self.ddb.get_reduced_displ_squared()
     
-        bose = self.ddb.get_bose(self.temperatures)
-    
         # FIXME this will not work for nsppol=2
         # nmode, nkpt, nband
         fan = einsum('knabij,objai->okn', self.eigr2d.EIG2D, displ_red_FAN2)
         ddw = einsum('knabij,objai->okn', self.eigr2d0.EIG2D, displ_red_DDW2)
 
         # Temperature dependence factor
-        tdep = 2 * bose + 1 if temperature else ones((nmode,1))
+        n_B = self.ddb.get_bose(self.temperatures)
+        tdep = 2 * n_B + 1 if temperature else ones((nmode,1))
 
         # Omega dependence factor
         odep = ones(nomegase) if omega else ones(1)
@@ -324,6 +325,8 @@ class QptAnalyzer(object):
         Compute the fan and ddw contributions to the self-energy
         from the active space, that is, the the lower bands.
 
+        Do not include the q-point weight.
+
         Returns: fan, ddw
 
         The return arrays vary in dimensions, depending on the input arguments.
@@ -348,9 +351,15 @@ class QptAnalyzer(object):
         if temperature:
             ntemp = self.ntemp
             temperatures = self.temperatures
+
+            # Bose-Enstein occupation number
+            # nmode, ntemp
+            n_B = self.ddb.get_bose(temperatures)
+
         else:
             ntemp = 1
             temperatures = zeros(1)
+            n_B = zeros((nmode,1))
 
         if omega:
             nomegase = self.nomegase
@@ -364,15 +373,6 @@ class QptAnalyzer(object):
             omega_q = self.ddb.omega[:].real
         else:
             omega_q = zeros(nmode)
-
-        # Bose-Enstein occupation number
-        # ntemp
-        bose = self.ddb.get_bose(temperatures)
-
-        if temperature:
-            n_B = bose
-        else:
-            n_B = zeros((nmode,1))
 
 
         # Fermi-Dirac occupation number
@@ -402,7 +402,7 @@ class QptAnalyzer(object):
         ddw = einsum('knmo,knm->okn', ddw_g2, 1.0 / delta_E_ddw)
 
         # nmode, ntemp
-        tdep = 2 * bose + 1
+        tdep = 2 * n_B + 1
 
         # FIXME This is not optimal: The mode indices will be summed
         #       so there is no need to create an array this big.
@@ -549,7 +549,8 @@ class QptAnalyzer(object):
         return se
 
 
-    def get_broadening(self, mode=False, temperature=False, omega=False, dynamical=True):
+    def get_broadening(self, mode=False, temperature=False,
+                       omega=False, dynamical=True):
         """
         Compute the zp broadening contribution from one q-point in a dynamical scheme.
         Only take the active space contribution.
@@ -588,58 +589,76 @@ class QptAnalyzer(object):
         # Fermi-Dirac occupation number
         # nspin, nkpt, nband, ntemp
         occ = self.eigq.get_fermi_function(self.mu, temperatures)
+    
+        # nkpt, nband, ntemp
+        f = occ[0]
 
         # nkpt, nband, nband, nmode
         fan_g2, ddw_g2 = self.get_fan_ddw_gkk2_active()
       
+        # nmode, ntemp, nkpt
+        n_B = einsum('ot,q->otq', n_B, ones(nkpt))
 
-        # ====== Coding line ================================================ #
-    
-        # nband
-        occ = self.get_occ_nospin()
-    
-        self.zpb = zeros((nkpt, nband), dtype=complex)
-      
-        # nmode
-        omega = self.ddb.omega[:].real
-    
-        fan_add  = zeros((nkpt,nband), dtype=complex)
-      
-        # nkpt, nband, nband, nmode
-        fan_num, ddw_num = self.get_fan_ddw_gkk2_active()
-      
-        # nkpt, nband, nband
-        delta_E = (einsum('kn,m->knm', self.eig0.EIG[0,:,:].real, ones(nband))
-                 - einsum('qm,n->qnm', self.eigq.EIG[0,:,:].real, ones(nband)))
-    
-        # nband
-        num1 = - (1. - occ) * (2 * occ - 1.)
-        num2 = - occ * (2 * occ - 1.)
-    
-        # nkpt, nband, nband, nmode
-        deno1 = (einsum('ijk,l->ijkl', delta_E, ones(3*natom))
-               - einsum('ijk,l->ijkl', ones((nkpt,nband,nband)), omega))
+        # nmode, ntemp, nkpt,nband
+        f = einsum('qmt,o->otqm', f, ones(nmode))
 
-        delta1 =  np.pi * delta_lorentzian(deno1, self.smearing)
-    
-        # nkpt, nband, nband, nmode
-        deno2 = (einsum('ijk,l->ijkl', delta_E, ones(3*natom))
-               + einsum('ijk,l->ijkl', ones((nkpt,nband,nband)), omega))
-
-        delta2 = np.pi * delta_lorentzian(deno2, self.smearing)
-
-        term1 = einsum('i,jkil->lijk', num1, delta1)
-        term2 = einsum('i,jkil->lijk', num2, delta2)
-
-        deltas = term1 + term2
-
+        # FIXME The sign should depend on the occupation at k, not at k+q.
+        #       (won't make a difference for insulators)
         # nkpt, nband
-        fan_add = einsum('ijkl,lkij->ij', fan_num, deltas)
+        sign = - (2 * f[0,0,:,:] - 1.)
 
-        self.zpb = fan_add * self.wtq
-        self.zpb = self.eig0.make_average(self.zpb)
-      
-        return self.zpb
+        broadening = zeros((nmode,ntemp,nomegase,nkpt,nband))
+
+        for jband in range(nband):
+
+            # nmode, ntemp, nkpt
+            num1 = (n_B + f[...,jband])
+            num2 = (n_B + 1 - f[...,jband])
+
+            # nkpt, nband
+            delta_E = (
+                self.eig0.EIG[0,:,:].real
+                - einsum('k,n->kn', self.eigq.EIG[0,:,jband].real, ones(nband))
+                )
+
+            # nkpt, nband, nomegase
+            delta_E_omega = (einsum('kn,l->knl', delta_E, ones(nomegase))
+                           + einsum('kn,l->knl', ones((nkpt,nband)), omega_se))
+
+            # nmode, nkpt, nband, nomegase
+            deno1 = (
+                einsum('knl,o->oknl', delta_E_omega, ones(nmode))
+              + einsum('o,knl->oknl', omega_q, ones((nkpt,nband,nomegase)))
+                )
+
+            # nmode, nkpt, nband, nomegase
+            deno2 = (
+                einsum('knl,o->oknl', delta_E_omega, ones(nmode))
+              - einsum('o,knl->oknl', omega_q, ones((nkpt,nband,nomegase)))
+                )
+
+            # nmode, nkpt, nband, nomegase
+            delta1 =  np.pi * delta_lorentzian(deno1, self.smearing)
+            delta2 =  np.pi * delta_lorentzian(deno2, self.smearing)
+    
+            # nmode, ntemp, nomegase, nkpt, nband
+            term1 = einsum('otk,oknl->otlkn', num1, delta1)
+            term2 = einsum('otk,oknl->otlkn', num2, delta1)
+
+            deltas = einsum('kn,otlkn->otlkn', sign, term1 + term2)
+            broadening_j = einsum('kno,otlkn->otlkn', fan_g2[:,:,jband,:], deltas)
+
+            broadening += broadening_j.real
+
+        # Reduce the arrays
+        broadening = self.reduce_array(broadening, mode=mode,
+                                       temperature=temperature, omega=omega)
+
+        broadening *= self.wtq
+        broadening = self.eig0.make_average(broadening)
+
+        return broadening
+
 
     def get_zp_self_energy(self):
         """
@@ -860,40 +879,73 @@ class QptAnalyzer(object):
         """
         Compute the zp broadening contribution from one q-point in a static scheme.
         Only take the active space contribution.
+        Returns: zpb[nkpt,nband]
         """
+
+        #self.zpb = self.get_broadening(mode=False, temperature=False,
+        #                               omega=False, dynamical=False)
+        #return self.zpb
+
         nkpt = self.nkpt
         nband = self.nband
         natom = self.natom
-      
+
         # nband
         occ = self.get_occ_nospin()
-    
+
         self.zpb = zeros((nkpt, nband), dtype=complex)
-      
+
         # nmode
         omega = self.ddb.omega[:].real
-      
+
         fan_add  = zeros((nkpt,nband), dtype=complex)
-    
+
         # nkpt, nband, nband, nmode
         fan_num, ddw_num = self.get_fan_ddw_gkk2_active()
-      
-        # nkpt, nband, nband
-        delta_E = (einsum('ij,k->ijk', self.eig0.EIG[0,:,:].real, ones(nband))
-                 - einsum('ij,k->ikj', self.eigq.EIG[0,:,:].real, ones(nband)))
-    
+
         # nband
         num = - (2 * occ - 1.)
-    
-        # nkpt, nband, nband, nmode
+
+        """
+        # nkpt, nband, nband
+        delta_E = (einsum('kn,m->knm', self.eig0.EIG[0,:,:].real, ones(nband))
+                 - einsum('km,n->knm', self.eigq.EIG[0,:,:].real, ones(nband)))
+
+        # nkpt, nband, nband
         delta =  np.pi * delta_lorentzian(delta_E, self.smearing)
-    
+
         # nband, nkpt, nband
-        deltasign = einsum('i,jki->ijk', num, delta)
-    
+        deltasign = einsum('m,knm->mkn', num, delta)
+
         # nkpt, nband
-        fan_add = einsum('ijkl,kij->ij', fan_num, deltasign)
-      
+        fan_add = einsum('knmo,mkn->kn', fan_num, deltasign)
+        """
+
+        for jband in range(nband):
+
+            # nkpt, nband,
+            delta_E = (
+                self.eig0.EIG[0,:,:].real
+                - einsum('k,n->kn', self.eigq.EIG[0,:,jband].real, ones(nband))
+                )
+
+            # nkpt, nband
+            delta =  np.pi * delta_lorentzian(delta_E, self.smearing)
+
+            # FIXME this is a bug, one should take f_kn, but this is f_kqm
+            # nkpt, nband
+            #deltasign = num[jband] * delta
+            deltasign = einsum('n,kn->kn', num, delta)
+
+            # nkpt, nband
+            fan_add += einsum('kno,kn->kn', fan_num[:,:,jband,:], deltasign)
+
+        # DEBUG
+        #print(num)
+        #print(delta_E)
+        #fan_add += 3.0  # Break the test
+        # END DEBUG
+    
         self.zpb = fan_add * self.wtq
         self.zpb = self.eig0.make_average(self.zpb)
       
