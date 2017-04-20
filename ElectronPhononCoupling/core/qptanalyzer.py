@@ -618,7 +618,7 @@ class QptAnalyzer(object):
             # nkpt, nband
             delta_E = (
                 self.eig0.EIG[0,:,:].real
-                - einsum('k,n->kn', self.eigq.EIG[0,:,jband].real, ones(nband))
+                - einsum('q,n->qn', self.eigq.EIG[0,:,jband].real, ones(nband))
                 )
 
             # nkpt, nband, nomegase
@@ -638,12 +638,12 @@ class QptAnalyzer(object):
                 )
 
             # nmode, nkpt, nband, nomegase
-            delta1 =  np.pi * delta_lorentzian(deno1, self.smearing)
-            delta2 =  np.pi * delta_lorentzian(deno2, self.smearing)
+            delta1 = np.pi * delta_lorentzian(deno1, self.smearing)
+            delta2 = np.pi * delta_lorentzian(deno2, self.smearing)
     
             # nmode, ntemp, nomegase, nkpt, nband
             term1 = einsum('otk,oknl->otlkn', num1, delta1)
-            term2 = einsum('otk,oknl->otlkn', num2, delta1)
+            term2 = einsum('otk,oknl->otlkn', num2, delta2)
 
             deltas = einsum('kn,otlkn->otlkn', sign, term1 + term2)
             broadening_j = einsum('kno,otlkn->otlkn', fan_g2[:,:,jband,:], deltas)
@@ -818,77 +818,21 @@ class QptAnalyzer(object):
         # nmode, nkpt, nband
         return self.zpr  # FIXME use self.zpr_mode?
 
-
     def get_zpb_dynamical(self):
         """
         Compute the zp broadening contribution from one q-point in a dynamical scheme.
         Only take the active space contribution.
         """
-    
-        nkpt = self.nkpt
-        nband = self.nband
-        natom = self.natom
-      
-        # nband
-        occ = self.get_occ_nospin()
-    
-        self.zpb = zeros((nkpt, nband), dtype=complex)
-      
-        # nmode
-        omega = self.ddb.omega[:].real
-    
-        fan_add  = zeros((nkpt,nband), dtype=complex)
-      
-        # nkpt, nband, nband, nmode
-        fan_num, ddw_num = self.get_fan_ddw_gkk2_active()
-      
-        # nkpt, nband, nband
-        delta_E = (einsum('kn,m->knm', self.eig0.EIG[0,:,:].real, ones(nband))
-                 - einsum('qm,n->qnm', self.eigq.EIG[0,:,:].real, ones(nband)))
-    
-        # nband
-        sign = np.sign(- (2 * occ - 1.) )
-
-        # nband
-        num1 = (1. - occ) * sign
-        num2 = occ * sign
-
-        # nband, nband
-        num1 = einsum('n,m->nm', sign, 1 - occ)
-        num2 = einsum('n,m->nm', sign, occ)
-    
-        # nkpt, nband, nband, nmode
-        deno1 = (einsum('ijk,l->ijkl', delta_E, ones(3*natom))
-               - einsum('ijk,l->ijkl', ones((nkpt,nband,nband)), omega))
-
-        delta1 =  np.pi * delta_lorentzian(deno1, self.smearing)
-    
-        # nkpt, nband, nband, nmode
-        deno2 = (einsum('ijk,l->ijkl', delta_E, ones(3*natom))
-               + einsum('ijk,l->ijkl', ones((nkpt,nband,nband)), omega))
-
-        delta2 = np.pi * delta_lorentzian(deno2, self.smearing)
-
-        term1 = einsum('nm,knmo->omkn', num1, delta1)
-        term2 = einsum('nm,knmo->omkn', num2, delta2)
-
-        deltas = term1 + term2
-
-        # nkpt, nband
-        fan_add = einsum('ijkl,lkij->ij', fan_num, deltas)
-
-        self.zpb = fan_add * self.wtq
-        self.zpb = self.eig0.make_average(self.zpb)
-      
+        self.zpb = self.get_broadening(mode=False, temperature=False,
+                                       omega=False, dynamical=True)
         return self.zpb
-
+    
     def get_zpb_static(self):
         """
         Compute the zp broadening contribution from one q-point in a static scheme.
         Only take the active space contribution.
         Returns: zpb[nkpt,nband]
         """
-
         self.zpb = self.get_broadening(mode=False, temperature=False,
                                        omega=False, dynamical=False)
         return self.zpb
