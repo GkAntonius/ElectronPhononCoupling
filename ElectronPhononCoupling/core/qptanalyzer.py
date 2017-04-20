@@ -847,8 +847,15 @@ class QptAnalyzer(object):
                  - einsum('qm,n->qnm', self.eigq.EIG[0,:,:].real, ones(nband)))
     
         # nband
-        num1 = - (1. - occ) * (2 * occ - 1.)
-        num2 = - occ * (2 * occ - 1.)
+        sign = np.sign(- (2 * occ - 1.) )
+
+        # nband
+        num1 = (1. - occ) * sign
+        num2 = occ * sign
+
+        # nband, nband
+        num1 = einsum('n,m->nm', sign, 1 - occ)
+        num2 = einsum('n,m->nm', sign, occ)
     
         # nkpt, nband, nband, nmode
         deno1 = (einsum('ijk,l->ijkl', delta_E, ones(3*natom))
@@ -862,8 +869,8 @@ class QptAnalyzer(object):
 
         delta2 = np.pi * delta_lorentzian(deno2, self.smearing)
 
-        term1 = einsum('i,jkil->lijk', num1, delta1)
-        term2 = einsum('i,jkil->lijk', num2, delta2)
+        term1 = einsum('nm,knmo->omkn', num1, delta1)
+        term2 = einsum('nm,knmo->omkn', num2, delta2)
 
         deltas = term1 + term2
 
