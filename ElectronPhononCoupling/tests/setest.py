@@ -203,6 +203,46 @@ class SETest(EPCTest):
             split_active=False,
             )
 
+    def get_zpb_dyn(self, dirname):
+        return self.get_kwargs(
+            dirname,
+            basename='zpb_dyn',
+            temperature=False,
+            broadening=True,
+            dynamical=True,
+            split_active=True,
+            )
+
+    def get_tdb_dyn(self, dirname):
+        return self.get_kwargs(
+            dirname,
+            basename='tdb_dyn',
+            temperature=True,
+            broadening=True,
+            dynamical=True,
+            split_active=True,
+            )
+
+    def get_zpb_stat(self, dirname):
+        return self.get_kwargs(
+            dirname,
+            basename='zpb_stat',
+            temperature=False,
+            broadening=True,
+            dynamical=False,
+            split_active=True,
+            )
+
+    def get_tdb_stat(self, dirname):
+        return self.get_kwargs(
+            dirname,
+            basename='tdb_stat',
+            temperature=True,
+            broadening=True,
+            dynamical=False,
+            split_active=True,
+            )
+
     def get_zpb_stat_nosplit(self, dirname):
         return self.get_kwargs(
             dirname,

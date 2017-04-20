@@ -822,10 +822,22 @@ class QptAnalyzer(object):
         """
         Compute the zp broadening contribution from one q-point in a dynamical scheme.
         Only take the active space contribution.
+        Returns: zpb[nkpt,nband]
         """
         self.zpb = self.get_broadening(mode=False, temperature=False,
                                        omega=False, dynamical=True)
         return self.zpb
+    
+    def get_tdb_dynamical(self):
+        """
+        Compute the td broadening contribution from one q-point in a dynamical scheme.
+        Only take the active space contribution.
+        Returns: zpb[nkpt,nband,ntemp]
+        """
+        self.tdb = self.get_broadening(mode=False, temperature=True,
+                                       omega=False, dynamical=True)
+        self.tdb = einsum('tkn->knt', self.tdb) # FIXME why??
+        return self.tdb
     
     def get_zpb_static(self):
         """
@@ -838,6 +850,17 @@ class QptAnalyzer(object):
         return self.zpb
 
     def get_tdb_static(self):
+        """
+        Compute the td broadening contribution from one q-point in a static scheme.
+        Only take the active space contribution.
+        Returns: zpb[nkpt,nband,ntemp]
+        """
+        self.tdb = self.get_broadening(mode=False, temperature=True,
+                                       omega=False, dynamical=False)
+        self.tdb = einsum('tkn->knt', self.tdb) # FIXME why??
+        return self.tdb
+
+    def get_tdb_static_nosplit(self):
         """
         Compute the q-point contribution to the temperature-dependent broadening
         in a static scheme from the EIGI2D files.
@@ -867,7 +890,7 @@ class QptAnalyzer(object):
         self.tdb = self.eig0.make_average(self.tdb)
     
         # nkpt, nband, ntemp
-        self.tdb = np.einsum('kij->ijk', self.tdb)
+        self.tdb = np.einsum('tkn->knt', self.tdb)
 
         return self.tdb
 

@@ -48,13 +48,6 @@ class Test_LiF_g2(SETest):
             key = 'temperature_dependent_renormalization',
             )
 
-    def test_zpb_dyn(self):
-        """Dynamical ZP Brd"""
-        self.run_compare_nc(
-            function = self.get_zpb_dyn,
-            key = 'zero_point_broadening',
-            )
-
     def test_zp_se(self):
         """Zero Point Self-Energy"""
         self.run_compare_nc(
@@ -83,15 +76,6 @@ class Test_LiF_g2(SETest):
             key = 'spectral_function_temperature_dependent',
             )
 
-
-    # Not implemented
-    #def test_tdb_stat(self):
-    #    """Static Tdep Brd"""
-    #    self.run_compare_nc(
-    #        function = self.get_zpb_dyn,
-    #        key = 'zero_point_broadening',
-    #        )
-
     def test_zpr_stat(self):
         """Static ZP Ren"""
         self.run_compare_nc(
@@ -105,22 +89,6 @@ class Test_LiF_g2(SETest):
             function = self.get_tdr_stat,
             key = 'temperature_dependent_renormalization',
             )
-
-    def test_zpb_stat(self):
-        """Static ZP Brd"""
-        self.run_compare_nc(
-            function = self.get_zpb_stat,
-            key = 'zero_point_broadening',
-            )
-
-    # Not implemented
-    #def test_tdb_stat(self):
-    #    """Static Temperature Dependent Broadening"""
-    #    self.run_compare_nc(
-    #        function = self.get_tdb_stat,
-    #        key = 'temperature_dependent_broadening',
-    #        nc_ref = test.outputs['t34'],  # was doing dynamical before
-    #        )
 
     def test_zpr_stat_nosplit(self):
         """Static Zero Point Renormalization"""
@@ -160,16 +128,12 @@ class Test_LiF_g2(SETest):
         for function in (
             self.get_zpr_dyn,
             self.get_tdr_dyn,
-            self.get_zpb_dyn,
-            #self.get_tdb_dyn,
             self.get_zp_se,
             self.get_zp_sf,
             self.get_td_se,
             self.get_td_sf,
             self.get_zpr_stat,
             self.get_tdr_stat,
-            self.get_zpb_stat,
-            #self.get_tdb_stat,
             self.get_zpr_stat_nosplit,
             self.get_tdr_stat_nosplit,
             self.get_zpb_stat_nosplit,

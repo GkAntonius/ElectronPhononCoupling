@@ -59,6 +59,34 @@ class Test_LiF_g4(SETest):
             key = 'zero_point_renormalization_by_modes',
             )
 
+    def test_zpb_dyn(self):
+        """Dynamical ZP Brd"""
+        self.run_compare_nc(
+            function = self.get_zpb_dyn,
+            key = 'zero_point_broadening',
+            )
+
+    def test_tdb_dyn(self):
+        """Dynamical TD Brd"""
+        self.run_compare_nc(
+            function = self.get_tdb_dyn,
+            key = 'temperature_dependent_broadening',
+            )
+
+    def test_zpb_stat(self):
+        """Static ZP Brd"""
+        self.run_compare_nc(
+            function = self.get_zpb_stat,
+            key = 'zero_point_broadening',
+            )
+
+    def test_tdb_stat(self):
+        """Dynamical TD Brd"""
+        self.run_compare_nc(
+            function = self.get_tdb_stat,
+            key = 'temperature_dependent_broadening',
+            )
+
     #def generate_tdr_dyn(self):
     #    return self.generate_test_ref(self.get_tdr_dyn)
 
@@ -73,6 +101,10 @@ class Test_LiF_g4(SETest):
             self.get_zpr_dyn,
             self.get_tdr_dyn,
             self.get_zpr_stat_mode,
+            self.get_zpb_dyn,
+            self.get_tdb_dyn,
+            self.get_zpb_stat,
+            self.get_tdb_stat,
             ):
             self.generate_ref(function)
 

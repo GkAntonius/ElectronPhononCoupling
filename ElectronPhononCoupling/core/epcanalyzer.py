@@ -543,6 +543,44 @@ class EpcAnalyzer(object):
             'get_zpr_static')
         self.renormalization_is_dynamical = False
 
+    def compute_dynamical_td_broadening(self):
+        """
+        Compute the temperature-dependent broadening in a static scheme
+        from the GKK files.
+        """
+        self.check_temperatures()
+        self.temperature_dependent_broadening = self.sum_qpt_function(
+            'get_tdb_dynamical')
+        self.broadening_is_dynamical = True
+
+    def compute_dynamical_zp_broadening(self):
+        """
+        Compute the zero-point broadening in a static scheme
+        from the GKK files.
+        """
+        self.zero_point_broadening = self.sum_qpt_function(
+            'get_zpb_dynamical')
+        self.broadening_is_dynamical = True
+
+    def compute_static_td_broadening(self):
+        """
+        Compute the temperature-dependent broadening in a static scheme
+        from the GKK files.
+        """
+        self.check_temperatures()
+        self.temperature_dependent_broadening = self.sum_qpt_function(
+            'get_tdb_static')
+        self.broadening_is_dynamical = False
+
+    def compute_static_zp_broadening(self):
+        """
+        Compute the zero-point broadening in a static scheme
+        from the GKK files.
+        """
+        self.zero_point_broadening = self.sum_qpt_function(
+            'get_zpb_static')
+        self.broadening_is_dynamical = False
+
     def compute_static_td_broadening_nosplit(self):
         """
         Compute the temperature-dependent broadening in a static scheme
@@ -550,7 +588,7 @@ class EpcAnalyzer(object):
         """
         self.check_temperatures()
         self.temperature_dependent_broadening = self.sum_qpt_function(
-            'get_tdb_static')
+            'get_tdb_static_nosplit')
         self.broadening_is_dynamical = False
 
     def compute_static_zp_broadening_nosplit(self):
@@ -561,28 +599,6 @@ class EpcAnalyzer(object):
         self.zero_point_broadening = self.sum_qpt_function(
             'get_zpb_static_nosplit')
         self.broadening_is_dynamical = False
-
-    def compute_dynamical_td_broadening(self):
-        self.check_temperatures()
-        warnings.warn(
-        'Dynamical lifetime at finite temperature is not yet implemented...'
-        'proceed with static lifetime')
-        return self.compute_static_td_broadening_nosplit()
-
-    def compute_dynamical_zp_broadening(self):
-        """
-        Compute the zero-point broadening in a dynamical scheme.
-        """
-        self.zero_point_broadening = self.sum_qpt_function(
-            'get_zpb_dynamical')
-        self.broadening_is_dynamical = True
-
-    def compute_static_td_broadening(self):
-        self.check_temperatures()
-        warnings.warn('Static lifetime at finite temperature '
-                      'with control over smearing is not yet implemented...'
-                      'proceed with static lifetime')
-        return self.compute_static_td_broadening_nosplit()
 
     def compute_static_zp_broadening(self):
         """
