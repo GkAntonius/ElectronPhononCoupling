@@ -343,7 +343,6 @@ class QptAnalyzer(object):
 
         nkpt = self.nkpt
         nband = self.nband
-        natom = self.natom
         nmode = self.nmode
 
         if temperature:
@@ -549,6 +548,145 @@ class QptAnalyzer(object):
     
         return se
 
+
+    def get_broadening(self, mode=False, temperature=False, omega=False, dynamical=True):
+        """
+        Compute the zp broadening contribution from one q-point in a dynamical scheme.
+        Only take the active space contribution.
+        """
+
+        nkpt = self.nkpt
+        nband = self.nband
+        nmode = self.nmode
+
+        if temperature:
+            ntemp = self.ntemp
+            temperatures = self.temperatures
+
+            # Bose-Enstein occupation number
+            # nmode, ntemp
+            n_B = self.ddb.get_bose(temperatures)
+
+        else:
+            ntemp = 1
+            temperatures = zeros(1)
+            n_B = zeros((nmode,1))
+
+        if omega:
+            nomegase = self.nomegase
+            omega_se = self.omegase
+        else:
+            # omega_se is measured from the bare eigenvalues
+            nomegase = 1
+            omega_se = zeros(1)
+
+        if dynamical:
+            omega_q = self.ddb.omega[:].real
+        else:
+            omega_q = zeros(nmode)
+
+        # Fermi-Dirac occupation number
+        # nspin, nkpt, nband, ntemp
+        occ = self.eigq.get_fermi_function(self.mu, temperatures)
+
+        # nkpt, nband, nband, nmode
+        fan_g2, ddw_g2 = self.get_fan_ddw_gkk2_active()
+      
+
+        # ====== Coding line ================================================ #
+    
+        # nband
+        occ = self.get_occ_nospin()
+    
+        self.zpb = zeros((nkpt, nband), dtype=complex)
+      
+        # nmode
+        omega = self.ddb.omega[:].real
+    
+        fan_add  = zeros((nkpt,nband), dtype=complex)
+      
+        # nkpt, nband, nband, nmode
+        fan_num, ddw_num = self.get_fan_ddw_gkk2_active()
+      
+        # nkpt, nband, nband
+        delta_E = (einsum('kn,m->knm', self.eig0.EIG[0,:,:].real, ones(nband))
+                 - einsum('qm,n->qnm', self.eigq.EIG[0,:,:].real, ones(nband)))
+    
+        # nband
+        num1 = - (1. - occ) * (2 * occ - 1.)
+        num2 = - occ * (2 * occ - 1.)
+    
+        # nkpt, nband, nband, nmode
+        deno1 = (einsum('ijk,l->ijkl', delta_E, ones(3*natom))
+               - einsum('ijk,l->ijkl', ones((nkpt,nband,nband)), omega))
+
+        delta1 =  np.pi * delta_lorentzian(deno1, self.smearing)
+    
+        # nkpt, nband, nband, nmode
+        deno2 = (einsum('ijk,l->ijkl', delta_E, ones(3*natom))
+               + einsum('ijk,l->ijkl', ones((nkpt,nband,nband)), omega))
+
+        delta2 = np.pi * delta_lorentzian(deno2, self.smearing)
+
+        term1 = einsum('i,jkil->lijk', num1, delta1)
+        term2 = einsum('i,jkil->lijk', num2, delta2)
+
+        deltas = term1 + term2
+
+        # nkpt, nband
+        fan_add = einsum('ijkl,lkij->ij', fan_num, deltas)
+
+        self.zpb = fan_add * self.wtq
+        self.zpb = self.eig0.make_average(self.zpb)
+      
+        return self.zpb
+
+    def get_zp_self_energy(self):
+        """
+        Compute the zp frequency-dependent dynamical self-energy from one q-point.
+    
+        The self-energy is evaluated on a frequency mesh 'omegase' that is shifted by the bare energies,
+        such that, what is retured is
+    
+            Simga'_kn(omega) = Sigma_kn(omega + E^0_kn)
+
+        Returns: sigma[nkpt,nband,nomegase]
+        """
+        self.sigma = self.get_self_energy(
+            mode=False,
+            temperature=False,
+            omega=True,
+            dynamical=True,
+            only_sternheimer=False,
+            only_active=False,
+            )
+        # nkpt, nband, nomegase, nband
+        self.sigma = einsum('lkn->knl', self.sigma) # FIXME why??
+        return self.sigma
+
+    def get_td_self_energy(self):
+        """
+        Compute the temperature depended and frequency-dependent dynamical self-energy from one q-point.
+    
+        The self-energy is evaluated on a frequency mesh 'omegase' that is shifted by the bare energies,
+        such that, what is retured is
+    
+            Simga'_kn(omega,T) = Sigma_kn(omega + E^0_kn, T)
+    
+        Returns: sigma[nkpt,nband,nomegase,ntemp]
+        """
+        self.sigma = self.get_self_energy(
+            mode=False,
+            temperature=True,
+            omega=True,
+            dynamical=True,
+            only_sternheimer=False,
+            only_active=False,
+            )
+        # nkpt, nband, nomegase, nband
+        self.sigma = einsum('tlkn->knlt', self.sigma) # FIXME why??
+        return self.sigma
+
     def get_zpr_static_sternheimer(self):
         """Compute the q-point zpr contribution in a static scheme."""
 
@@ -592,6 +730,76 @@ class QptAnalyzer(object):
             ).real
         return self.zpr
 
+    def get_tdr_static(self):
+        """
+        Compute the q-point contribution to the temperature-dependent
+        renormalization in a static scheme,
+        with the transitions split between active and sternheimer.
+        """
+        self.tdr = self.get_self_energy(
+            mode=False,
+            temperature=True,
+            omega=False,
+            dynamical=False,
+            only_sternheimer=False,
+            only_active=False,
+            ).real
+        # nkpt, nband, ntemp
+        self.tdr = einsum('tkn->knt', self.tdr) # FIXME why??
+        return self.tdr
+    
+    def get_tdr_dynamical(self):
+        """
+        Compute the q-point contribution to the temperature-dependent
+        renormalization in a dynamical scheme.
+        """
+        self.tdr = self.get_self_energy(
+            mode=False,
+            temperature=True,
+            omega=False,
+            dynamical=True,
+            only_sternheimer=False,
+            only_active=False,
+            ).real
+        # nkpt, nband, ntemp
+        self.tdr = einsum('tkn->knt', self.tdr) # FIXME why??
+        return self.tdr
+
+    def get_tdr_static_nosplit(self):
+        """
+        Compute the q-point contribution to the temperature-dependent
+        renormalization in a static scheme.
+        """
+        self.tdr = self.get_self_energy(
+            mode=False,
+            temperature=True,
+            omega=False,
+            dynamical=False,
+            only_sternheimer=True,
+            only_active=False,
+            ).real
+        # nkpt, nband, ntemp
+        self.tdr = einsum('tkn->knt', self.tdr) # FIXME why??
+        return self.tdr
+
+    def get_zpr_static_modes(self):
+        """
+        Compute the q-point zpr contribution in a static scheme,
+        with the transitions split between active and sternheimer.
+        Retain the mode decomposition of the zpr.
+        """
+        self.zpr = self.get_self_energy(
+            mode=True,
+            temperature=False,
+            omega=False,
+            dynamical=False,
+            only_sternheimer=False,
+            only_active=False,
+            ).real
+        # nmode, nkpt, nband
+        return self.zpr  # FIXME use self.zpr_mode?
+
+
     def get_zpb_dynamical(self):
         """
         Compute the zp broadening contribution from one q-point in a dynamical scheme.
@@ -616,8 +824,8 @@ class QptAnalyzer(object):
         fan_num, ddw_num = self.get_fan_ddw_gkk2_active()
       
         # nkpt, nband, nband
-        delta_E = (einsum('ij,k->ijk', self.eig0.EIG[0,:,:].real, ones(nband))
-                 - einsum('ij,k->ikj', self.eigq.EIG[0,:,:].real, ones(nband)))
+        delta_E = (einsum('kn,m->knm', self.eig0.EIG[0,:,:].real, ones(nband))
+                 - einsum('qm,n->qnm', self.eigq.EIG[0,:,:].real, ones(nband)))
     
         # nband
         num1 = - (1. - occ) * (2 * occ - 1.)
@@ -653,7 +861,6 @@ class QptAnalyzer(object):
         Compute the zp broadening contribution from one q-point in a static scheme.
         Only take the active space contribution.
         """
-    
         nkpt = self.nkpt
         nband = self.nband
         natom = self.natom
@@ -692,325 +899,6 @@ class QptAnalyzer(object):
       
         return self.zpb
 
-    def get_zp_self_energy(self):
-        """
-        Compute the zp frequency-dependent dynamical self-energy from one q-point.
-    
-        The self-energy is evaluated on a frequency mesh 'omegase' that is shifted by the bare energies,
-        such that, what is retured is
-    
-            Simga'_kn(omega) = Sigma_kn(omega + E^0_kn)
-
-        Returns: sigma[nkpt,nband,nomegase]
-        """
-    
-        nkpt = self.nkpt
-        nband = self.nband
-        natom = self.natom
-    
-        nomegase = self.nomegase
-
-        ntemp = 1
-        temperatures = zeros(1)
-      
-        self.sigma = zeros((nkpt, nband, nomegase), dtype=complex)
-      
-        # nmode
-        omega = self.ddb.omega[:].real
-    
-        fan = zeros((nomegase, nkpt, nband), dtype=complex)
-        ddw = zeros((nkpt, nband), dtype=complex)
-        fan_add  = zeros((nomegase, nkpt,nband), dtype=complex)
-        ddw_add  = zeros((nkpt, nband), dtype=complex)
-      
-        # Sternheimer contribution
-        # ------------------------
-      
-        fan, ddw = self.get_fan_ddw_sternheimer(mode=False, temperature=False, omega=True)
-      
-        # Active space contribution
-        # -------------------------
-      
-        # nkpt, nband, nband, nmode
-        fan_num, ddw_num = self.get_fan_ddw_gkk2_active()
-    
-        # nkpt, nband, nband
-        ddw_tmp = np.sum(ddw_num, axis=3)
-    
-        # nband
-        occ0 = self.get_occ_nospin()
-    
-        # Fermi-Dirac occupation number
-        # nspin, nkpt, nband, ntemp
-        occ = self.eigq.get_fermi_function(self.mu, temperatures)
-
-        # nkpt, nband, nband
-        delta_E_ddw = (einsum('kn,m->knm', self.eig0.EIG[0,:,:].real, ones(nband))
-                     - einsum('kn,m->kmn', self.eig0.EIG[0,:,:].real, ones(nband))
-                     - einsum('kn,m->knm', ones((nkpt,nband)), (2*occ0-1)) * self.smearing * 1j)
-    
-        # nkpt, nband
-        ddw_add = einsum('knm,knm->kn', ddw_tmp, 1.0 / delta_E_ddw)
-        ddw_add = einsum('kn,l->lkn', ddw_add, ones(nomegase))
-    
-        # nband
-        num1 = 1.0 - occ[0,:,:,0]
-        num2 = occ[0,:,:,0]
-    
-        # nomegase, nkpt, nband
-        fan_add = zeros((nomegase, nkpt, nband), dtype=complex)
-    
-        # FIXME These should be the occ at k
-        # nkpt, nband
-        eta = (2 * occ[0,:,:,0] - 1) * self.smearing * 1j
-
-        for kband in range(nband):
-
-            #eta = ones((nkpt, nband)) * (2*occ0[kband]-1) * self.smearing * 1j
-            #eta = einsum('n,k->kn', ones(nband), (2*occ[0,:,kband,0]-1) * self.smearing * 1j)
-    
-            # nkpt, nband
-            # delta_E[ikpt,jband] = E[ikpt,jband] - E[ikpt,kband] - (2f[kband] -1) * eta * 1j
-            delta_E = (
-                self.eig0.EIG[0,:,:].real
-              - einsum('k,n->kn', self.eigq.EIG[0,:,kband].real, ones(nband))
-              - eta)
-    
-            # nkpt, nband, nomegase
-            # delta_E_omega[ikpt,jband,lomega] = omega[lomega] + E[ikpt,jband] - E[ikpt,kband] - (2f[kband] -1) * eta * 1j
-            delta_E_omega = (einsum('kn,l->knl', delta_E, ones(nomegase))
-                           + einsum('kn,l->knl', ones((nkpt,nband)), self.omegase))
-    
-            # nkpt, nband, nomegase, nmode
-            deno1 = (einsum('knl,o->knlo', delta_E_omega, ones(3*natom))
-                   - einsum('knl,o->knlo', ones((nkpt,nband,nomegase)), omega))
-    
-            # nmode, nkpt, nband, nomegase
-            div1 = einsum('k,knlo->oknl', num1[:,kband], 1.0 / deno1)
-    
-            del deno1
-    
-            # nkpt, nband, nomegase, nmode
-            deno2 = (einsum('knl,o->knlo', delta_E_omega, ones(3*natom))
-                   + einsum('knl,o->knlo', ones((nkpt,nband,nomegase)), omega))
-    
-            del delta_E_omega
-    
-            # nmode, nkpt, nband, nomegase
-            div2 = einsum('k,knlo->oknl', num2[:,kband], 1.0 / deno2)
-    
-            del deno2
-    
-            # nomegase, nkpt, nband
-            fan_add += einsum('kno,oknl->lkn', fan_num[:,:,kband,:], div1 + div2)
-    
-            del div1, div2
-      
-    
-        # Summing Sternheimer and active space contributions
-        # --------------------------------------------------
-      
-
-        fan += fan_add
-        ddw += ddw_add
-    
-        self.sigma = (fan - ddw) * self.wtq
-    
-        self.sigma = self.eig0.make_average(self.sigma)
-        self.sigma = einsum('lkn->knl', self.sigma)
-      
-        return self.sigma
-
-    def get_td_self_energy(self):
-        """
-        Compute the temperature depended and frequency-dependent dynamical self-energy from one q-point.
-    
-        The self-energy is evaluated on a frequency mesh 'omegase' that is shifted by the bare energies,
-        such that, what is retured is
-    
-            Simga'_kn(omega,T) = Sigma_kn(omega + E^0_kn, T)
-    
-        Returns: sigma[nkpt,nband,nomegase,ntemp]
-        """
-        self.sigma = self.get_self_energy(
-            mode=False,
-            temperature=True,
-            omega=True,
-            dynamical=True,
-            only_sternheimer=False,
-            only_active=False,
-            )
-        # nkpt, nband, nomegase, nband
-        self.sigma = einsum('tlkn->knlt', self.sigma) # FIXME why??
-        return self.sigma
-
-    def get_tdr_static(self):
-        """
-        Compute the q-point contribution to the temperature-dependent
-        renormalization in a static scheme,
-        with the transitions split between active and sternheimer.
-        """
-    
-        nkpt = self.nkpt
-        nband = self.nband
-        natom = self.natom
-        ntemp = self.ntemp
-    
-        # These indicies be swapped at the end
-        self.tdr = zeros((ntemp, nkpt, nband), dtype=complex)
-    
-        bose = self.ddb.get_bose(self.temperatures)
-    
-        fan =  zeros((ntemp, nkpt, nband), dtype=complex)
-        ddw = zeros((ntemp, nkpt, nband), dtype=complex)
-        fan_add = zeros((ntemp, nkpt, nband),dtype=complex)
-        ddw_add = zeros((ntemp, nkpt, nband),dtype=complex)
-    
-        # Sternheimer contribution
-        # ------------------------
-      
-        # ntemp, nkpt, nband
-        fan, ddw = self.get_fan_ddw_sternheimer(mode=False, temperature=True, omega=False)
-      
-        # Active space contribution
-        # ------------------------
-
-        fan_num, ddw_num = self.get_fan_ddw_gkk2_active()
-    
-        # ikpt,iband,jband      
-        delta_E = (einsum('ij,k->ijk', self.eig0.EIG[0,:,:].real, ones(nband)) -
-                   einsum('ij,k->ikj', self.eigq.EIG[0,:,:].real, ones(nband)))
-    
-        delta_E_ddw = (einsum('ij,k->ijk', self.eig0.EIG[0,:,:].real, ones(nband)) -
-                       einsum('ij,k->ikj', self.eig0.EIG[0,:,:].real, ones(nband)))
-    
-        # imode,ntemp,ikpt,iband,jband
-        num = einsum('ij,klm->ijklm', 2*bose+1., delta_E)
-    
-        # ikpt,iband,jband
-        deno = delta_E ** 2 + self.smearing ** 2
-    
-        # imode,ntemp,ikpt,iband,jband 
-        div =  einsum('ijklm,klm->ijklm', num, 1. / deno)
-    
-        #(ikpt,iband,jband,imode),(imode,ntemp,ikpt,iband,jband)->ntemp,ikpt,iband
-        fan_add = einsum('ijkl,lmijk->mij', fan_num, div)
-    
-        # imode,ntemp,ikpt,iband,jband
-        num = einsum('ij,klm->ijklm', 2*bose+1., delta_E_ddw)
-    
-        # ikpt,iband,jband
-        deno = delta_E_ddw ** 2 + self.smearing ** 2
-    
-        div =  einsum('ijklm,klm->ijklm', num, 1. / deno)
-    
-        #(ikpt,iband,jband,imode),(imode,ntemp,ikpt,iband,jband)->ntemp,ikpt,iband 
-        ddw_add = einsum('ijkl,lmijk->mij', ddw_num, div)
-    
-    
-        fan += fan_add
-        ddw += ddw_add
-    
-        self.tdr = (fan - ddw) * self.wtq
-    
-        self.tdr = self.eig0.make_average(self.tdr)
-    
-        # nkpt, nband, ntemp
-        self.tdr = np.einsum('kij->ijk', self.tdr)
-    
-        return self.tdr
-
-    def get_tdr_dynamical(self):
-        """
-        Compute the q-point contribution to the temperature-dependent
-        renormalization in a dynamical scheme.
-        """
-    
-        nkpt = self.nkpt
-        nband = self.nband
-        natom = self.natom
-        ntemp = self.ntemp
-    
-        self.tdr =  zeros((ntemp, nkpt, nband), dtype=complex)
-    
-        bose = self.ddb.get_bose(self.temperatures)
-    
-        fan =  zeros((ntemp, nkpt, nband), dtype=complex)
-        ddw = zeros((ntemp, nkpt, nband), dtype=complex)
-        fan_add = zeros((ntemp, nkpt, nband),dtype=complex)
-        ddw_add = zeros((ntemp, nkpt, nband),dtype=complex)
-    
-        # Sternheimer contribution
-        # ------------------------
-      
-        # ntemp, nkpt, nband
-        fan, ddw = self.get_fan_ddw_sternheimer(mode=False, temperature=True, omega=False)
-      
-        # Active space contribution
-        # -------------------------
-
-        fan_num, ddw_num = self.get_fan_ddw_gkk2_active()
-    
-        # jband
-        occ = self.get_occ_nospin()
-    
-        delta_E_ddw = (einsum('ij,k->ijk', self.eig0.EIG[0,:,:].real, ones(nband)) -
-                       einsum('ij,k->ikj', self.eig0.EIG[0,:,:].real, ones(nband)) -
-                       einsum('ij,k->ijk', ones((nkpt, nband)), (2*occ-1)) * self.smearing * 1j)
-    
-        # ntemp,ikpt,iband,jband
-        tmp = einsum('ijkl,lm->mijk', ddw_num, 2*bose+1.0)
-        ddw_add = einsum('ijkl,jkl->ijk', tmp, 1.0 / delta_E_ddw)
-    
-        # ikpt,iband,jband
-        delta_E = (einsum('ij,k->ijk', self.eig0.EIG[0,:,:].real, ones(nband)) -
-                   einsum('ij,k->ikj', self.eigq.EIG[0,:,:].real, ones(nband)) -
-                   einsum('ij,k->ijk', ones((nkpt,nband)), (2*occ-1)) * self.smearing * 1j)
-    
-        omega = self.ddb.omega[:].real # imode
-    
-        # imode,ntemp,jband
-        num1 = (einsum('ij,k->ijk', bose, ones(nband)) + 1.0 -
-                einsum('ij,k->ijk', ones((3*natom, ntemp)), occ))
-    
-        # ikpt,iband,jband,imode
-        deno1 = (einsum('ijk,l->ijkl', delta_E,ones(3*natom)) -
-                 einsum('ijk,l->ijkl', ones((nkpt, nband, nband)), omega))
-    
-        # (imode,ntemp,jband)/(ikpt,iband,jband,imode) ==> imode,ntemp,jband,ikpt,iband
-        invdeno1 = np.real(deno1) / (np.real(deno1) ** 2 + np.imag(deno1) ** 2)
-        div1 = einsum('ijk,lmki->ijklm', num1, invdeno1)
-        #div1 = einsum('ijk,lmki->ijklm', num1, 1.0 / deno1)
-    
-        # imode,ntemp,jband
-        num2 = (einsum('ij,k->ijk', bose, ones(nband)) +
-                einsum('ij,k->ijk', ones((3*natom, ntemp)), occ))
-    
-        # ikpt,iband,jband,imode
-        deno2 = (einsum('ijk,l->ijkl', delta_E, ones(3*natom)) +
-                 einsum('ijk,l->ijkl', ones((nkpt, nband, nband)), omega))
-    
-        # (imode,ntemp,jband)/(ikpt,iband,jband,imode) ==> imode,ntemp,jband,ikpt,iband
-        invdeno2 = np.real(deno2) / (np.real(deno2) ** 2 + np.imag(deno2) ** 2)
-        div2 = einsum('ijk,lmki->ijklm', num2, invdeno2)
-        #div2 = einsum('ijk,lmki->ijklm', num2, 1.0 / deno2)
-    
-        # ikpt,iband,jband,imode
-        fan_add = einsum('ijkl,lmkij->mij', fan_num, div1 + div2)
-    
-
-        fan += fan_add
-        ddw += ddw_add
-    
-        self.tdr = (fan - ddw) * self.wtq
-    
-        self.tdr = self.eig0.make_average(self.tdr)
-    
-        # nkpt, nband, ntemp
-        self.tdr = np.einsum('kij->ijk', self.tdr)
-    
-        return self.tdr
-
     def get_tdb_static(self):
         """
         Compute the q-point contribution to the temperature-dependent broadening
@@ -1045,74 +933,6 @@ class QptAnalyzer(object):
 
         return self.tdb
 
-    def get_zpr_static_modes(self):
-        """
-        Compute the q-point zpr contribution in a static scheme,
-        with the transitions split between active and sternheimer.
-        Retain the mode decomposition of the zpr.
-        """
-    
-        nkpt = self.nkpt
-        nband = self.nband
-        natom = self.natom
-        nmode = 3 * natom
-      
-        self.zpr = zeros((nmode, nkpt, nband), dtype=complex)
-      
-        fan = zeros((nmode, nkpt, nband), dtype=complex)
-        ddw = zeros((nmode, nkpt, nband), dtype=complex)
-        fan_active  = zeros((nmode, nkpt, nband), dtype=complex)
-        ddw_active  = zeros((nmode, nkpt, nband), dtype=complex)
-      
-        # Sternheimer contribution
-        # ------------------------
-
-        # nmode, nkpt, nband
-        fan, ddw = self.get_fan_ddw_sternheimer(mode=True, temperature=False, omega=False)
-      
-        # Active space contribution
-        # -------------------------
-      
-        # nkpt, nband, nband, nmode
-        fan_num, ddw_num = self.get_fan_ddw_gkk2_active()
-
-        # nmode, nkpt, nband, nband
-        fan_tmp = einsum('ijkl->lijk', fan_num)
-        ddw_tmp = einsum('ijkl->lijk', ddw_num)
-        #fan_tmp = np.sum(fan_num, axis=3)
-        #ddw_tmp = np.sum(ddw_num, axis=3)
-      
-        # nkpt, nband, nband
-        delta_E = (einsum('ij,k->ijk', self.eig0.EIG[0,:,:].real, ones(nband))
-                 - einsum('ij,k->ikj', self.eigq.EIG[0,:,:].real, ones(nband)))
-    
-        # nkpt, nband, nband
-        delta_E_ddw = (einsum('ij,k->ijk', self.eig0.EIG[0,:,:].real, ones(nband))
-                     - einsum('ij,k->ikj', self.eig0.EIG[0,:,:].real, ones(nband)))
-    
-        # nkpt, nband, nband
-        div =  delta_E / (delta_E ** 2 + self.smearing ** 2)
-    
-        # nmode, nkpt, nband
-        fan_active = einsum('lijk,ijk->lij', fan_tmp, div)
-    
-        # nkpt, nband, nband
-        div_ddw = delta_E_ddw / (delta_E_ddw ** 2 + self.smearing ** 2)
-    
-        # nmode, nkpt, nband
-        ddw_active = einsum('lijk,ijk->lij', ddw_tmp, div_ddw)
-    
-      
-        # Correction from active space 
-        fan += fan_active
-        ddw += ddw_active
-    
-        self.zpr = (fan - ddw) * self.wtq
-    
-        self.zpr = self.eig0.make_average(self.zpr)
-      
-        return self.zpr
-
     def get_zpb_static_nosplit(self):
         """
         Compute the zp broadening contribution from one q-point in a static scheme
@@ -1139,22 +959,4 @@ class QptAnalyzer(object):
         self.zpb = self.eig0.make_average(self.zpb)
     
         return self.zpb
-
-    def get_tdr_static_nosplit(self):
-        """
-        Compute the q-point contribution to the temperature-dependent
-        renormalization in a static scheme.
-        """
-    
-        # ntemp, nkpt, nband
-        fan, ddw = self.get_fan_ddw_sternheimer(mode=False, temperature=True, omega=False)
-    
-        self.tdr = (fan - ddw) * self.wtq
-    
-        self.tdr = self.eig0.make_average(self.tdr)
-
-        # nkpt, nband, ntemp
-        self.tdr = np.einsum('tkn->knt', self.tdr)
-    
-        return self.tdr
 

@@ -18,7 +18,8 @@ def compute(
         spectral_function = False,
         dynamical = True,
         split_active = True,
-        double_grid = False,
+        mode = False,  # FIXME undocumented
+        double_grid = False,  # FIXME undocumented
         write = True,
         verbose = False,
 
@@ -219,6 +220,9 @@ def compute(
                 epc.compute_static_td_renormalization()
             else:
                 epc.compute_static_zp_renormalization()
+
+                if mode:
+                    epc.compute_static_zp_renormalization_modes()
 
         if broadening:
 

@@ -51,6 +51,14 @@ class Test_LiF_g4(SETest):
             key = 'temperature_dependent_renormalization',
             )
 
+    # ZPR
+    def test_zpr_stat_mode(self):
+        """Dynamical zero-point renormalization"""
+        self.run_compare_nc(
+            function = self.get_zpr_stat_mode,
+            key = 'zero_point_renormalization_by_modes',
+            )
+
     #def generate_tdr_dyn(self):
     #    return self.generate_test_ref(self.get_tdr_dyn)
 
@@ -64,6 +72,7 @@ class Test_LiF_g4(SETest):
         for function in (
             self.get_zpr_dyn,
             self.get_tdr_dyn,
+            self.get_zpr_stat_mode,
             ):
             self.generate_ref(function)
 

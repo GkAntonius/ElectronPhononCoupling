@@ -147,6 +147,16 @@ class SETest(EPCTest):
             dynamical=False,
             )
 
+    def get_zpr_stat_mode(self, dirname):
+        return self.get_kwargs(
+            dirname,
+            basename='zpr_stat_mode',
+            temperature=False,
+            renormalization=True,
+            dynamical=False,
+            mode=True,
+            )
+
     def get_tdr_stat(self, dirname):
         return self.get_kwargs(
             dirname,
