@@ -79,6 +79,14 @@ class EpcAnalyzer(object):
                  eigi2d_fnames=list(),
                  fan_fnames=list(),
                  gkk_fnames=list(),
+
+                 # Double grid
+                 nqpt_fine=1,
+                 wtq_fine=[1.0],
+                 eigq_fine_fnames=list(),
+                 gkk_fine_fnames=list(),
+                 ddb_fine_fnames=list(),
+
                  **kwargs):
 
         # Check that the minimum number of files is present
@@ -98,23 +106,44 @@ class EpcAnalyzer(object):
         self.nqpt = nqpt
         self.set_weights(wtq)
 
+        self.nqpt_fine = nqpt_fine
+        self.set_weights_fine(wtq_fine)
+
         # Set file names
         self.eig0_fname = eigk_fname
         self.eigq_fnames = eigq_fnames
-        self.DDB_fnames = ddb_fnames
-        self.EIGR2D_fnames = eigr2d_fnames
-        self.EIGI2D_fnames = eigi2d_fnames
-        self.FAN_fnames = fan_fnames
-        self.GKK_fnames = gkk_fnames
+        self.ddb_fnames = ddb_fnames
+        self.eigr2d_fnames = eigr2d_fnames
+        self.eigi2d_fnames = eigi2d_fnames
+        self.fan_fnames = fan_fnames
+        self.gkk_fnames = gkk_fnames
 
-        # Initialize a single QptAnalyzer
+        self.eigq_fine_fnames = eigq_fine_fnames
+        self.ddb_fine_fnames = ddb_fine_fnames
+        self.gkk_fine_fnames = gkk_fine_fnames
+
+
+        # Initialize a single QptAnalyzer for q=0
+
+        if self.gkk_fnames:
+            gkk0 = self.gkk_fnames[0]
+        elif self.gkk_fine_fnames:
+            gkk0 = self.gkk_fine_fnames[0]
+        else:
+            gkk0 = None
+
+        if self.fan_fnames:
+            fan0 = self.fan_fnames[0]
+        else:
+            fan0 = None
+
         self.qptanalyzer = QptAnalyzer(
             wtq=self.wtq[0],
             eigk_fname=self.eig0_fname,
-            ddb_fname=self.DDB_fnames[0],
-            eigr2d0_fname=self.EIGR2D_fnames[0],
-            fan0_fname=self.FAN_fnames[0] if self.FAN_fnames else None,
-            gkk0_fname=self.GKK_fnames[0] if self.GKK_fnames else None,
+            ddb_fname=self.ddb_fnames[0],
+            eigr2d0_fname=self.eigr2d_fnames[0],
+            fan0_fname=fan0,
+            gkk0_fname=gkk0,
             asr=asr,
             )
 
@@ -123,9 +152,6 @@ class EpcAnalyzer(object):
 
         # Read other files at q=0 and broadcast the data
         self.read_zero_files()
-
-        # Split the workload between workers
-        self.distribute_workload()
 
         # Get arrays dimensions
         self.nkpt = self.qptanalyzer.eigr2d0.nkpt
@@ -138,6 +164,10 @@ class EpcAnalyzer(object):
         self.set_omega_range(omega_range)
         self.set_smearing(smearing)
         self.set_output(rootname)
+
+        # Split the workload between workers
+        # (needed to find the fermi level)
+        self.distribute_workload()
 
         # Set the fermi level
         if fermi_level is None:
@@ -216,6 +246,13 @@ class EpcAnalyzer(object):
         else:
             self.wtq = np.array(wtq)
 
+    def set_weights_fine(self, wtq, normalize=True):
+        """Set the q-points weights."""
+        if normalize:
+            self.wtq_fine = np.array(wtq) / sum(wtq)
+        else:
+            self.wtq_fine = np.array(wtq)
+
     def set_fermi_level(self, mu):
         """Set the Fermi level, in Hartree."""
         self.mu = mu
@@ -241,29 +278,50 @@ class EpcAnalyzer(object):
 
         self.set_fermi_level(mu)
 
-    def set_iqpt(self, iqpt):
+    def set_iqpt(self, iqpt, fine=False):
+        """
+        Give the qptanalyzer the weight and files corresponding
+        to one particular qpoint and read the files. 
+        """
+        if fine:
+            self.set_iqpt_fine(iqpt)
+        else:
+            self.set_iqpt_coarse(iqpt)
+
+    def set_iqpt_coarse(self, iqpt):
         """
         Give the qptanalyzer the weight and files corresponding
         to one particular qpoint and read the files. 
         """
         self.qptanalyzer.wtq = self.wtq[iqpt]
-        self.qptanalyzer.ddb.fname = self.DDB_fnames[iqpt]
+        self.qptanalyzer.ddb.fname = self.ddb_fnames[iqpt]
 
-        if self.EIGR2D_fnames:
-            self.qptanalyzer.eigr2d.fname = self.EIGR2D_fnames[iqpt]
+        if self.eigr2d_fnames:
+            self.qptanalyzer.eigr2d.fname = self.eigr2d_fnames[iqpt]
 
         if self.eigq_fnames:
             self.qptanalyzer.eigq.fname = self.eigq_fnames[iqpt]
 
-        if self.FAN_fnames:
-            self.qptanalyzer.fan.fname = self.FAN_fnames[iqpt]
+        if self.fan_fnames:
+            self.qptanalyzer.fan.fname = self.fan_fnames[iqpt]
 
-        if self.GKK_fnames:
-            self.qptanalyzer.gkk.fname = self.GKK_fnames[iqpt]
+        if self.gkk_fnames:
+            self.qptanalyzer.gkk.fname = self.gkk_fnames[iqpt]
 
-        if self.EIGI2D_fnames:
-            self.qptanalyzer.eigi2d.fname = self.EIGI2D_fnames[iqpt]
+        if self.eigi2d_fnames:
+            self.qptanalyzer.eigi2d.fname = self.eigi2d_fnames[iqpt]
 
+        self.qptanalyzer.read_nonzero_files()
+
+    def set_iqpt_fine(self, iqpt):
+        """
+        Give the qptanalyzer the weight and files corresponding
+        to one particular qpoint and read the files. 
+        """
+        self.qptanalyzer.wtq = self.wtq_fine[iqpt]
+        self.qptanalyzer.ddb.fname = self.ddb_fine_fnames[iqpt]
+        self.qptanalyzer.eigq.fname = self.eigq_fine_fnames[iqpt]
+        self.qptanalyzer.gkk.fname = self.gkk_fine_fnames[iqpt]
         self.qptanalyzer.read_nonzero_files()
 
     def set_ddb(self, iqpt):
@@ -272,29 +330,38 @@ class EpcAnalyzer(object):
         to one particular qpoint, then read and diagonalize the dynamical matrix.
         """
         self.qptanalyzer.wtq = self.wtq[iqpt]
-        self.qptanalyzer.ddb.fname = self.DDB_fnames[iqpt]
+        self.qptanalyzer.ddb.fname = self.ddb_fnames[iqpt]
         self.qptanalyzer.read_ddb()
 
     @mpi_watch
-    def distribute_workload(self):
+    def distribute_workload(self, fine=False):
+        """Distribute the q-points indicies to be treated by each worker."""
+        if fine:
+            self.my_iqpts = self.get_iqpts(self.nqpt_fine)
+        else:
+            self.my_iqpts = self.get_iqpts(self.nqpt)
+
+    def get_iqpts(self, nqpt):
         """Distribute the q-points indicies to be treated by each worker."""
 
         max_nqpt_per_worker = (
-            self.nqpt // size + min(self.nqpt % size, 1))
+            nqpt // size + min(nqpt % size, 1))
         n_active_workers = (
-            self.nqpt // max_nqpt_per_worker
-            + min(self.nqpt % max_nqpt_per_worker, 1))
+            nqpt // max_nqpt_per_worker
+            + min(nqpt % max_nqpt_per_worker, 1))
 
-        self.my_iqpts = list()
+        my_iqpts = list()
 
         for i in range(max_nqpt_per_worker):
 
             iqpt = rank * max_nqpt_per_worker + i
 
-            if iqpt >= self.nqpt:
+            if iqpt >= nqpt:
                 break
 
-            self.my_iqpts.append(iqpt)
+            my_iqpts.append(iqpt)
+
+        return my_iqpts
 
     @property
     def active_worker(self):
@@ -309,10 +376,11 @@ class EpcAnalyzer(object):
         return np.arange(n_active_workers)
 
     @mpi_watch
-    def sum_qpt_function(self, func_name, *args, **kwargs):
+    def sum_qpt_function(self, func_name, fine=False, *args, **kwargs):
         """Call a certain function or each q-points and sum the result."""
 
-        partial_sum = self.sum_qpt_function_me(func_name, *args, **kwargs)
+        partial_sum = self.sum_qpt_function_me(func_name, fine=fine,
+                                               *args, **kwargs)
 
         if i_am_master:
             total = partial_sum
@@ -334,13 +402,16 @@ class EpcAnalyzer(object):
 
         return total
 
-    def sum_qpt_function_me(self, func_name, *args, **kwargs):
-        """Call a certain function or each q-points of this worker and sum the result."""
+    def sum_qpt_function_me(self, func_name, fine=False, *args, **kwargs):
+        """
+        Call a certain function or each q-points of this worker
+        and sum the result.
+        """
         if not self.active_worker:
             return None
 
         iqpt = self.my_iqpts[0]
-        self.set_iqpt(iqpt)
+        self.set_iqpt(iqpt, fine=fine)
 
         if self.verbose:
             print("Q-point: {} with wtq = {} and reduced coord. {}".format(
@@ -354,7 +425,7 @@ class EpcAnalyzer(object):
 
         for iqpt in self.my_iqpts[1:]:
 
-            self.set_iqpt(iqpt)
+            self.set_iqpt(iqpt, fine=fine)
 
             if self.verbose:
                 print("Q-point: {} with wtq = {} and reduced coord. {}".format(
@@ -497,6 +568,7 @@ class EpcAnalyzer(object):
 
     def compute_static_zp_renormalization_nosplit(self):
         """Compute the zero-point renormalization in a static scheme."""
+        self.distribute_workload()
         self.zero_point_renormalization = self.sum_qpt_function('get_zpr_static_sternheimer')
         self.renormalization_is_dynamical = False
 
@@ -505,21 +577,43 @@ class EpcAnalyzer(object):
         Compute the temperature-dependent renormalization in a static scheme.
         """
         self.check_temperatures()
+        self.distribute_workload()
         self.temperature_dependent_renormalization = self.sum_qpt_function(
             'get_tdr_static_nosplit')
         self.renormalization_is_dynamical = False
 
     def compute_dynamical_td_renormalization(self):
         """
-        Compute the temperature-dependent renormalization in a dynamical scheme.
+        Compute the temperature-dependent renormalization
+        in a dynamical scheme.
         """
         self.check_temperatures()
+        self.distribute_workload()
         self.temperature_dependent_renormalization = self.sum_qpt_function(
             'get_tdr_dynamical')
         self.renormalization_is_dynamical = True
 
+    def compute_dynamical_td_renormalization_double_grid(self):
+        """
+        Compute the temperature-dependent renormalization
+        in a dynamical scheme.
+        """
+        self.check_temperatures()
+        self.distribute_workload(fine=False)
+        tdr_stern = self.sum_qpt_function('get_tdr_static_nosplit',
+                                          fine=False)
+
+        self.distribute_workload(fine=True)
+        self.read_zero_files()
+        tdr_active = self.sum_qpt_function('get_tdr_dynamical_active',
+                                           fine=True)
+
+        self.temperature_dependent_renormalization = tdr_stern + tdr_active
+        self.renormalization_is_dynamical = True
+
     def compute_dynamical_zp_renormalization(self):
         """Compute the zero-point renormalization in a dynamical scheme."""
+        self.distribute_workload()
         self.zero_point_renormalization = self.sum_qpt_function(
             'get_zpr_dynamical')
         self.renormalization_is_dynamical = True
@@ -530,6 +624,7 @@ class EpcAnalyzer(object):
         with the transitions split between active and sternheimer.
         """
         self.check_temperatures()
+        self.distribute_workload()
         self.temperature_dependent_renormalization = self.sum_qpt_function(
             'get_tdr_static')
         self.renormalization_is_dynamical = False
@@ -549,6 +644,7 @@ class EpcAnalyzer(object):
         from the GKK files.
         """
         self.check_temperatures()
+        self.distribute_workload()
         self.temperature_dependent_broadening = self.sum_qpt_function(
             'get_tdb_dynamical')
         self.broadening_is_dynamical = True
@@ -558,6 +654,7 @@ class EpcAnalyzer(object):
         Compute the zero-point broadening in a static scheme
         from the GKK files.
         """
+        self.distribute_workload()
         self.zero_point_broadening = self.sum_qpt_function(
             'get_zpb_dynamical')
         self.broadening_is_dynamical = True
@@ -568,6 +665,7 @@ class EpcAnalyzer(object):
         from the GKK files.
         """
         self.check_temperatures()
+        self.distribute_workload()
         self.temperature_dependent_broadening = self.sum_qpt_function(
             'get_tdb_static')
         self.broadening_is_dynamical = False
@@ -577,6 +675,7 @@ class EpcAnalyzer(object):
         Compute the zero-point broadening in a static scheme
         from the GKK files.
         """
+        self.distribute_workload()
         self.zero_point_broadening = self.sum_qpt_function(
             'get_zpb_static')
         self.broadening_is_dynamical = False
@@ -587,6 +686,7 @@ class EpcAnalyzer(object):
         from the EIGI2D files.
         """
         self.check_temperatures()
+        self.distribute_workload()
         self.temperature_dependent_broadening = self.sum_qpt_function(
             'get_tdb_static_nosplit')
         self.broadening_is_dynamical = False
@@ -596,6 +696,7 @@ class EpcAnalyzer(object):
         Compute the zero-point broadening in a static scheme
         from the EIGI2D files.
         """
+        self.distribute_workload()
         self.zero_point_broadening = self.sum_qpt_function(
             'get_zpb_static_nosplit')
         self.broadening_is_dynamical = False
@@ -605,6 +706,7 @@ class EpcAnalyzer(object):
         Compute the zero-point broadening in a static scheme
         from the FAN files.
         """
+        self.distribute_workload()
         self.zero_point_broadening = self.sum_qpt_function('get_zpb_static')
         self.broadening_is_dynamical = False
 
@@ -614,7 +716,7 @@ class EpcAnalyzer(object):
         with the transitions split between active and sternheimer.
         Retain the mode decomposition of the zpr.
         """
-
+        self.distribute_workload()
         self.zero_point_renormalization_modes = self.sum_qpt_function('get_zpr_static_modes')
         self.renormalization_is_dynamical = False
 
@@ -628,6 +730,7 @@ class EpcAnalyzer(object):
             Simga'_kn(omega) = Sigma_kn(omega + E^0_kn)
     
         """
+        self.distribute_workload()
         self.self_energy = self.sum_qpt_function('get_zp_self_energy')
 
     def compute_td_self_energy(self):
@@ -640,6 +743,7 @@ class EpcAnalyzer(object):
             Simga'_kn(omega,T) = Sigma_kn(omega + E^0_kn,T)
     
         """
+        self.distribute_workload()
         self.self_energy_T = self.sum_qpt_function('get_td_self_energy')
 
     @master_only
@@ -708,7 +812,7 @@ class EpcAnalyzer(object):
         with nc.Dataset(self.nc_output, 'w') as ds:
 
             # Read dim from first EIGR2D file
-            dim = nc.Dataset(self.EIGR2D_fnames[0], 'r')
+            dim = nc.Dataset(self.eigr2d_fnames[0], 'r')
 
             # Determine nsppol from reading occ
             nsppol = len(dim.variables['occupations'][:,0,0])

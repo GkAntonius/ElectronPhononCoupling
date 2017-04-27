@@ -801,6 +801,41 @@ class QptAnalyzer(object):
         self.tdr = einsum('tkn->knt', self.tdr) # FIXME why??
         return self.tdr
 
+    def get_tdr_dynamical_active(self):
+        """
+        Compute the q-point contribution to the temperature-dependent
+        renormalization in a dynamical scheme,
+        taking only the active space contribution.
+        """
+        self.tdr = self.get_self_energy(
+            mode=False,
+            temperature=True,
+            omega=False,
+            dynamical=True,
+            only_sternheimer=False,
+            only_active=True,
+            ).real
+        # nkpt, nband, ntemp
+        self.tdr = einsum('tkn->knt', self.tdr) # FIXME why??
+        return self.tdr
+
+    def get_zpr_dynamical_active(self):
+        """
+        Compute the q-point contribution to the zero point
+        renormalization in a dynamical scheme,
+        taking only the active space contribution.
+        """
+        self.tdr = self.get_self_energy(
+            mode=False,
+            temperature=False,
+            omega=False,
+            dynamical=True,
+            only_sternheimer=False,
+            only_active=True,
+            ).real
+        # nkpt, nband, ntemp
+        return self.tdr
+
     def get_zpr_static_modes(self):
         """
         Compute the q-point zpr contribution in a static scheme,

@@ -40,6 +40,14 @@ def compute(
         fan_fnames = list(),
         gkk_fnames = list(),
 
+        # Double grid
+        # FIXME documentation
+        nqpt_fine=1,
+        wtq_fine=[1.0],
+        eigq_fine_fnames=list(),
+        gkk_fine_fnames=list(),
+        ddb_fine_fnames=list(),
+
         **kwargs):
     """
     Compute electron-phonon coupling related quantities
@@ -166,6 +174,7 @@ def compute(
     epc = EpcAnalyzer(
         nqpt=nqpt, 
         wtq=wtq,
+
         eigk_fname=eigk_fname,
         eigq_fnames=eigq_fnames,
         ddb_fnames=ddb_fnames,
@@ -173,10 +182,21 @@ def compute(
         eigi2d_fnames=eigi2d_fnames,
         fan_fnames=fan_fnames,
         gkk_fnames=gkk_fnames,
+
         temp_range=temp_range,
         omega_range=omega_range,
         smearing=smearing_Ha,
+
+        write=write,
         rootname=rootname,
+
+        # Double grid
+        nqpt_fine=nqpt_fine,
+        wtq_fine=wtq_fine,
+        eigq_fine_fnames=eigq_fine_fnames,
+        gkk_fine_fnames=gkk_fine_fnames,
+        ddb_fine_fnames=ddb_fine_fnames,
+
         verbose=verbose,
         **kwargs)
 
@@ -201,7 +221,10 @@ def compute(
         if renormalization:
 
             if temperature:
-                epc.compute_dynamical_td_renormalization()
+                if double_grid:
+                    epc.compute_dynamical_td_renormalization_double_grid()
+                else:
+                    epc.compute_dynamical_td_renormalization()
             else:
                 epc.compute_dynamical_zp_renormalization()
 
