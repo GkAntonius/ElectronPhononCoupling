@@ -195,7 +195,7 @@ def compute(
         smearing_Ha = smearing_eV / Ha2eV
 
     # Initialize epc
-    epc = EpcAnalyzer(
+    epca = EpcAnalyzer(
         nqpt=nqpt, 
         wtq=wtq,
 
@@ -214,7 +214,6 @@ def compute(
         write=write,
         rootname=rootname,
 
-        # Double grid
         nqpt_fine=nqpt_fine,
         wtq_fine=wtq_fine,
         eigq_fine_fnames=eigq_fine_fnames,
@@ -229,16 +228,16 @@ def compute(
     if self_energy:
 
         if temperature:
-            epc.compute_td_self_energy()
+            epca.compute_td_self_energy()
 
             if spectral_function:
-                epc.compute_td_spectral_function()
+                epca.compute_td_spectral_function()
 
         else:
-            epc.compute_zp_self_energy()
+            epca.compute_zp_self_energy()
 
             if spectral_function:
-                epc.compute_zp_spectral_function()
+                epca.compute_zp_spectral_function()
 
     if dynamical and split_active:
 
@@ -246,61 +245,61 @@ def compute(
 
             if temperature:
                 if double_grid:
-                    epc.compute_dynamical_td_renormalization_double_grid()
+                    epca.compute_dynamical_td_renormalization_double_grid()
                 else:
-                    epc.compute_dynamical_td_renormalization()
+                    epca.compute_dynamical_td_renormalization()
             else:
-                epc.compute_dynamical_zp_renormalization()
+                epca.compute_dynamical_zp_renormalization()
 
         if broadening:
 
             if temperature:
-                epc.compute_dynamical_td_broadening()
+                epca.compute_dynamical_td_broadening()
             else:
-                epc.compute_dynamical_zp_broadening()
+                epca.compute_dynamical_zp_broadening()
 
     elif not dynamical and split_active:
 
         if renormalization:
 
             if temperature:
-                epc.compute_static_td_renormalization()
+                epca.compute_static_td_renormalization()
             else:
-                epc.compute_static_zp_renormalization()
+                epca.compute_static_zp_renormalization()
 
                 if mode:
-                    epc.compute_static_zp_renormalization_modes()
+                    epca.compute_static_zp_renormalization_modes()
 
         if broadening:
 
             if temperature:
-                epc.compute_static_td_broadening()
+                epca.compute_static_td_broadening()
             else:
-                epc.compute_static_zp_broadening()
+                epca.compute_static_zp_broadening()
 
     elif not dynamical and not split_active:
 
         if renormalization:
 
             if temperature:
-                epc.compute_static_td_renormalization_nosplit()
+                epca.compute_static_td_renormalization_nosplit()
             else:
-                epc.compute_static_zp_renormalization_nosplit()
+                epca.compute_static_zp_renormalization_nosplit()
 
         if broadening:
 
             if temperature:
-                epc.compute_static_td_broadening_nosplit()
+                epca.compute_static_td_broadening_nosplit()
             else:
-                epc.compute_static_zp_broadening_nosplit()
+                epca.compute_static_zp_broadening_nosplit()
 
 
     # Write the files
     if write:
-        epc.write_netcdf()
-        epc.write_renormalization()
+        epca.write_netcdf()
+        epca.write_renormalization()
         if broadening:
-            epc.write_broadening()
+            epca.write_broadening()
 
     return epc
 

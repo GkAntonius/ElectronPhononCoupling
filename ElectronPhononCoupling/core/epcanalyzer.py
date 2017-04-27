@@ -27,6 +27,7 @@ class EpcAnalyzer(object):
     in a phonon response-function calculation, with one q-point per dataset,
     the first q-point being Gamma.
 
+    For documentation, see `ElectronPhononCoupling.compute`
     """
     verbose = False
     wtq = None
@@ -58,6 +59,7 @@ class EpcAnalyzer(object):
     my_iqpts = [0]
 
     def __init__(self,
+
                  # Options
                  asr=True,
                  verbose=False,
