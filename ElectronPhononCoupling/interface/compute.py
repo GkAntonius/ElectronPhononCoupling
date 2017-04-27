@@ -18,8 +18,8 @@ def compute(
         spectral_function = False,
         dynamical = True,
         split_active = True,
-        mode = False,  # FIXME undocumented
-        double_grid = False,  # FIXME undocumented
+        mode = False,
+        double_grid = False,
         write = True,
         verbose = False,
 
@@ -41,7 +41,6 @@ def compute(
         gkk_fnames = list(),
 
         # Double grid
-        # FIXME documentation
         nqpt_fine=1,
         wtq_fine=[1.0],
         eigq_fine_fnames=list(),
@@ -91,6 +90,11 @@ def compute(
         Compute the spectral function.
         Requires frequency-dependent self-energy (self_energy=True).
 
+    double_grid: (False)
+        Activate the use of the double grid technique.
+        If True, the user must provide values for:
+        nqpt_fine, wtq_fine, eigq_fine_fnames, gkk_fine_fnames, ddb_fine_fnames
+
     dynamical: (True)
         Use the dynamical AHC theory.
         Otherwise, the static AHC theory is used.
@@ -101,6 +105,9 @@ def compute(
         to produce both EIGR2D.nc and GKK.nc files.
         If set to False, it means that Abinit was run with ieig2rf=1 
         to produce only EIGR2D.nc files.
+
+    mode: (False)
+        Do a mode-by-mode decomposition of the ZPR.
 
     write: (True)
         Write the results on the disk.
@@ -116,7 +123,15 @@ def compute(
         Number of q-points.
 
     wtq: ([1.])
-        Weights of all the q-points. Should sum up to 1.
+        Weights of all the q-points.
+        Should sum up to 1, but will be normalized anyway.
+
+    nqpt_fine: (1)
+        Number of q-points on the fine grid.
+
+    wtq_fine: ([1.])
+        Weights of all the q-points on the fine grid.
+        Should sum up to 1, but will be normalized anyway.
 
     smearing_eV: (0.01)
         Imaginary parameter (eta) used in the self-energy denominator.
@@ -156,6 +171,15 @@ def compute(
     eigi2d_fnames: ([])
         Names of _EIGI2D.nc files. Only relevant when split_active=False
         and broadening=True.
+
+    ddb_fine_fnames: ([])
+        Names of _DDB.nc files at k+q on the fine grid.
+
+    eigq_fine_fnames: ([])
+        Names of _EIG.nc files at k+q on the fine grid.
+
+    gkk_fine_fnames: ([])
+        Names of _GKK.nc files on the fine grid.
 
 
     Returns
