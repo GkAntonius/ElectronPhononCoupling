@@ -47,6 +47,20 @@ class Test_LiF_double_grid(SETest):
             key = 'temperature_dependent_renormalization',
             )
 
+    def test_zp_se_double_grid(self):
+        """Dynamical temperature dependent renormalization"""
+        self.run_compare_nc(
+            function = self.get_zp_se_double_grid,
+            key = 'self_energy',
+            )
+
+    def test_td_se_double_grid(self):
+        """Dynamical temperature dependent renormalization"""
+        self.run_compare_nc(
+            function = self.get_td_se_double_grid,
+            key = 'self_energy_temperature_dependent',
+            )
+
     # All
     def generate(self):
         """Generate epc data for all tests."""
@@ -56,6 +70,8 @@ class Test_LiF_double_grid(SETest):
 
         for function in (
             self.get_tdr_dyn_double_grid,
+            self.get_zp_se_double_grid,
+            self.get_td_se_double_grid,
             ):
             self.generate_ref(function)
 

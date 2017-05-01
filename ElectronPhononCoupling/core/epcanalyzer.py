@@ -613,6 +613,24 @@ class EpcAnalyzer(object):
         self.temperature_dependent_renormalization = tdr_stern + tdr_active
         self.renormalization_is_dynamical = True
 
+    def compute_dynamical_zp_renormalization_double_grid(self):
+        """
+        Compute the temperature-dependent renormalization
+        in a dynamical scheme.
+        """
+        self.check_temperatures()
+        self.distribute_workload(fine=False)
+        zpr_stern = self.sum_qpt_function('get_zpr_static_sternheimer',
+                                          fine=False)
+
+        self.distribute_workload(fine=True)
+        self.read_zero_files()
+        zpr_active = self.sum_qpt_function('get_zpr_dynamical_active',
+                                           fine=True)
+
+        self.zero_point_renormalization = zpr_stern + zpr_active
+        self.renormalization_is_dynamical = True
+
     def compute_dynamical_zp_renormalization(self):
         """Compute the zero-point renormalization in a dynamical scheme."""
         self.distribute_workload()
@@ -804,6 +822,39 @@ class EpcAnalyzer(object):
              + self.self_energy_T.imag ** 2)
             )
 
+    def compute_zp_self_energy_double_grid(self):
+        """
+        Compute the temperature-dependent renormalization
+        in a dynamical scheme.
+        """
+        self.check_temperatures()
+        self.distribute_workload(fine=False)
+        se_stern = self.sum_qpt_function('get_zp_self_energy_sternheimer',
+                                          fine=False)
+
+        self.distribute_workload(fine=True)
+        self.read_zero_files()
+        se_active = self.sum_qpt_function('get_zp_self_energy_active',
+                                           fine=True)
+
+        self.self_energy = se_stern + se_active
+
+    def compute_td_self_energy_double_grid(self):
+        """
+        Compute the temperature-dependent renormalization
+        in a dynamical scheme.
+        """
+        self.check_temperatures()
+        self.distribute_workload(fine=False)
+        se_stern = self.sum_qpt_function('get_td_self_energy_sternheimer',
+                                          fine=False)
+
+        self.distribute_workload(fine=True)
+        self.read_zero_files()
+        se_active = self.sum_qpt_function('get_td_self_energy_active',
+                                           fine=True)
+
+        self.self_energy_T = se_stern + se_active
 
     @master_only
     def write_netcdf(self):

@@ -274,3 +274,21 @@ class SETest(EPCTest):
             double_grid=True,
             )
 
+    def get_zp_se_double_grid(self, dirname):
+        return self.get_kwargs(
+            dirname,
+            basename='zp_se_double_grid',
+            self_energy=True,
+            temperature=False,
+            double_grid=True,
+            )
+
+    def get_td_se_double_grid(self, dirname):
+        return self.get_kwargs(
+            dirname,
+            basename='td_se_double_grid',
+            self_energy=True,
+            temperature=True,
+            double_grid=True,
+            )
+

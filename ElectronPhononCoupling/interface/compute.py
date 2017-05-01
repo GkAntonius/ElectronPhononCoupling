@@ -228,13 +228,19 @@ def compute(
     if self_energy:
 
         if temperature:
-            epca.compute_td_self_energy()
+            if double_grid:
+                epca.compute_td_self_energy_double_grid()
+            else:
+                epca.compute_td_self_energy()
 
             if spectral_function:
                 epca.compute_td_spectral_function()
 
         else:
-            epca.compute_zp_self_energy()
+            if double_grid:
+                epca.compute_zp_self_energy_double_grid()
+            else:
+                epca.compute_zp_self_energy()
 
             if spectral_function:
                 epca.compute_zp_spectral_function()

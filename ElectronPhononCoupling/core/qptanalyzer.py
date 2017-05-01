@@ -662,10 +662,11 @@ class QptAnalyzer(object):
 
     def get_zp_self_energy(self):
         """
-        Compute the zp frequency-dependent dynamical self-energy from one q-point.
+        Compute the zp frequency-dependent dynamical self-energy
+        from one q-point.
     
-        The self-energy is evaluated on a frequency mesh 'omegase' that is shifted by the bare energies,
-        such that, what is retured is
+        The self-energy is evaluated on a frequency mesh 'omegase'
+        that is shifted by the bare energies, such that, what is retured is
     
             Simga'_kn(omega) = Sigma_kn(omega + E^0_kn)
 
@@ -685,10 +686,11 @@ class QptAnalyzer(object):
 
     def get_td_self_energy(self):
         """
-        Compute the temperature depended and frequency-dependent dynamical self-energy from one q-point.
+        Compute the temperature depended and frequency-dependent
+        dynamical self-energy from one q-point.
     
-        The self-energy is evaluated on a frequency mesh 'omegase' that is shifted by the bare energies,
-        such that, what is retured is
+        The self-energy is evaluated on a frequency mesh 'omegase'
+        that is shifted by the bare energies, such that, what is retured is
     
             Simga'_kn(omega,T) = Sigma_kn(omega + E^0_kn, T)
     
@@ -700,6 +702,106 @@ class QptAnalyzer(object):
             omega=True,
             dynamical=True,
             only_sternheimer=False,
+            only_active=False,
+            )
+        # nkpt, nband, nomegase, nband
+        self.sigma = einsum('tlkn->knlt', self.sigma) # FIXME why??
+        return self.sigma
+
+    def get_zp_self_energy_active(self):
+        """
+        Compute the zp frequency-dependent dynamical self-energy
+        from one q-point.
+        Only include the active space contribution.
+    
+        The self-energy is evaluated on a frequency mesh 'omegase'
+        that is shifted by the bare energies, such that, what is retured is
+    
+            Simga'_kn(omega) = Sigma_kn(omega + E^0_kn)
+
+        Returns: sigma[nkpt,nband,nomegase]
+        """
+        self.sigma = self.get_self_energy(
+            mode=False,
+            temperature=False,
+            omega=True,
+            dynamical=True,
+            only_sternheimer=False,
+            only_active=True,
+            )
+        # nkpt, nband, nomegase, nband
+        self.sigma = einsum('lkn->knl', self.sigma) # FIXME why??
+        return self.sigma
+
+    def get_zp_self_energy_sternheimer(self):
+        """
+        Compute the zp frequency-dependent dynamical self-energy
+        from one q-point.
+        Only include the Sternheimer contribution.
+    
+        The self-energy is evaluated on a frequency mesh 'omegase'
+        that is shifted by the bare energies, such that, what is retured is
+    
+            Simga'_kn(omega) = Sigma_kn(omega + E^0_kn)
+
+        Returns: sigma[nkpt,nband,nomegase]
+        """
+        self.sigma = self.get_self_energy(
+            mode=False,
+            temperature=False,
+            omega=True,
+            dynamical=True,
+            only_sternheimer=True,
+            only_active=False,
+            )
+        # nkpt, nband, nomegase, nband
+        self.sigma = einsum('lkn->knl', self.sigma) # FIXME why??
+        return self.sigma
+
+    def get_td_self_energy_active(self):
+        """
+        Compute the temperature depended and frequency-dependent
+        dynamical self-energy from one q-point.
+        Only include the active space contribution.
+    
+        The self-energy is evaluated on a frequency mesh 'omegase'
+        that is shifted by the bare energies, such that, what is retured is
+    
+            Simga'_kn(omega,T) = Sigma_kn(omega + E^0_kn, T)
+    
+        Returns: sigma[nkpt,nband,nomegase,ntemp]
+        """
+        self.sigma = self.get_self_energy(
+            mode=False,
+            temperature=True,
+            omega=True,
+            dynamical=True,
+            only_sternheimer=False,
+            only_active=True,
+            )
+        # nkpt, nband, nomegase, nband
+        self.sigma = einsum('tlkn->knlt', self.sigma) # FIXME why??
+        return self.sigma
+
+    def get_td_self_energy_sternheimer(self):
+        """
+        Compute the temperature depended and frequency-dependent
+        dynamical self-energy from one q-point.
+        Only include the Sternheimer contribution.
+    
+        The self-energy is evaluated on a frequency mesh 'omegase'
+        that is shifted by the bare energies, such that, what is retured is
+    
+            Simga'_kn(omega,T) = Sigma_kn(omega + E^0_kn, T)
+    
+        Returns: sigma[nkpt,nband,nomegase,ntemp]
+        """
+        self.sigma = self.get_self_energy(
+            mode=False,
+            temperature=True,
+            omega=True,
+            dynamical=True,
+            only_sternheimer=True,
             only_active=False,
             )
         # nkpt, nband, nomegase, nband
@@ -825,7 +927,7 @@ class QptAnalyzer(object):
         renormalization in a dynamical scheme,
         taking only the active space contribution.
         """
-        self.tdr = self.get_self_energy(
+        self.zpr = self.get_self_energy(
             mode=False,
             temperature=False,
             omega=False,
@@ -834,7 +936,7 @@ class QptAnalyzer(object):
             only_active=True,
             ).real
         # nkpt, nband, ntemp
-        return self.tdr
+        return self.zpr
 
     def get_zpr_static_modes(self):
         """
