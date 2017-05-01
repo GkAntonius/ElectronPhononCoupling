@@ -262,3 +262,15 @@ class SETest(EPCTest):
             dynamical=False,
             split_active=False,
             )
+
+    def get_tdr_dyn_double_grid(self, dirname):
+        return self.get_kwargs(
+            dirname,
+            basename='tdb_dyn_double_grid',
+            temperature=True,
+            renormalization=True,
+            dynamical=True,
+            split_active=True,
+            double_grid=True,
+            )
+

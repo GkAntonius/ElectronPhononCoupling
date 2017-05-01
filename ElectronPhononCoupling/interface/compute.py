@@ -301,5 +301,5 @@ def compute(
         if broadening:
             epca.write_broadening()
 
-    return epc
+    return epca
 
