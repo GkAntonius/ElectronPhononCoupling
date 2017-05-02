@@ -146,7 +146,7 @@ class QptAnalyzer(object):
         if self.gkk0.fname:
             self.gkk0.broadcast()
 
-    def get_occ_nospin(self):
+    def get_occ_kq_nospin(self):
         """
         Get the occupations, being either 0 or 1, regardless of spinor.
         Assumes a gapped system, where occupations are the same at all kpts. 
@@ -168,7 +168,7 @@ class QptAnalyzer(object):
 
     def get_max_val(self):
         """Get the maximum valence band energy."""
-        occ0 = self.get_occ_nospin()
+        occ0 = self.get_occ_kq_nospin()
         eig = self.eigq.EIG[0,0,:]
 
         E_last = eig[0]
@@ -181,7 +181,7 @@ class QptAnalyzer(object):
 
     def get_min_cond(self):
         """Get the minimum conduction band energy."""
-        occ0 = self.get_occ_nospin()
+        occ0 = self.get_occ_kq_nospin()
         eig = self.eigq.EIG[0,0,:]
 
         for f, E in zip(occ0, eig):
@@ -387,16 +387,13 @@ class QptAnalyzer(object):
         # DDW term
         # --------
 
-        # FIXME Here we need the occ at k
-        #       But these are the occ at k+q
-        #       (important for metals)
-        # nband
-        occ0 = self.get_occ_nospin()
+        # nkpt, nband
+        occ0 = self.eig0.get_fermi_function_T0(self.mu)[0,:,:]
     
         # nkpt, nband, nband
         delta_E_ddw = (einsum('kn,m->knm', self.eig0.EIG[0,:,:].real, ones(nband))
                      - einsum('kn,m->kmn', self.eig0.EIG[0,:,:].real, ones(nband))
-                     - einsum('kn,m->knm', ones((nkpt,nband)), (2*occ0-1)) * self.smearing * 1j)
+                     - einsum('m,kn->knm', ones(nband), (2*occ0-1)) * self.smearing * 1j)
 
         # nmode, nkpt, nband
         ddw = einsum('knmo,knm->okn', ddw_g2, 1.0 / delta_E_ddw)
@@ -436,9 +433,8 @@ class QptAnalyzer(object):
         num2 = (einsum('ot,kn->knot', n_B, ones((nkpt,nband)))
               + einsum('knt,o->knot', occ[0,:,:,:], ones(nmode)))
 
-        # FIXME These should be the occ at k
         # nkpt, nband
-        eta = (2 * occ[0,:,:,0] - 1) * self.smearing * 1j
+        eta = (2 * occ0 - 1) * self.smearing * 1j
 
         for jband in range(nband):
 
@@ -593,6 +589,9 @@ class QptAnalyzer(object):
         # nkpt, nband, ntemp
         f = occ[0]
 
+        # nkpt, nband
+        occ0 = self.eig0.get_fermi_function_T0(self.mu)[0,:,:]
+    
         # nkpt, nband, nband, nmode
         fan_g2, ddw_g2 = self.get_fan_ddw_gkk2_active()
       
@@ -602,10 +601,8 @@ class QptAnalyzer(object):
         # nmode, ntemp, nkpt,nband
         f = einsum('qmt,o->otqm', f, ones(nmode))
 
-        # FIXME The sign should depend on the occupation at k, not at k+q.
-        #       (won't make a difference for insulators)
         # nkpt, nband
-        sign = np.sign(- (2 * f[0,0,:,:] - 1.))
+        sign = np.sign(- (2 * occ0 - 1.))
 
         broadening = zeros((nmode,ntemp,nomegase,nkpt,nband))
 
