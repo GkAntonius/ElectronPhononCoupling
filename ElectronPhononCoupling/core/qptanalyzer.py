@@ -320,7 +320,8 @@ class QptAnalyzer(object):
       
         return fan, ddw
     
-    def get_fan_ddw_active(self, mode=False, omega=False, temperature=False, dynamical=True):
+    def get_fan_ddw_active(self, mode=False, omega=False, temperature=False,
+                           dynamical=True):
         """
         Compute the fan and ddw contributions to the self-energy
         from the active space, that is, the the lower bands.
