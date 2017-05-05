@@ -729,6 +729,15 @@ class EpcAnalyzer(object):
             self.sum_qpt_function('get_zpb_static_nosplit'))
         self.broadening_is_dynamical = False
 
+    def compute_ddw_active_zpr(self):
+        """
+        Compute the zero-point renormalization in a static scheme
+        with the transitions split between active and sternheimer.
+        """
+        self.zero_point_renormalization = (
+            self.sum_qpt_function('get_zpr_ddw_active'))
+        self.renormalization_is_dynamical = False
+
     def compute_static_zp_broadening(self):
         """
         Compute the zero-point broadening in a static scheme

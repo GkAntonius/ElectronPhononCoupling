@@ -513,6 +513,8 @@ class QptAnalyzer(object):
                         dynamical=True,
                         only_sternheimer=False,
                         only_active=False,
+                        only_fan=False,
+                        only_ddw=False,
                         ):
 
         if only_sternheimer and only_active:
@@ -540,7 +542,14 @@ class QptAnalyzer(object):
                 omega=omega,
                 dynamical=dynamical)
 
-        se = self.wtq * (fan - ddw)
+        if only_fan:
+            se_q = fan
+        elif only_ddw:
+            se_q = - ddw
+        else:
+            se_q = fan - ddw
+
+        se = self.wtq * se_q
         se = self.eig0.make_average(se)
     
         return se
@@ -1056,3 +1065,18 @@ class QptAnalyzer(object):
     
         return self.zpb
 
+    def get_zpr_ddw_active(self):
+        """
+        Compute the q-point zpr contribution in a static scheme
+        with the transitions split between active and sternheimer.
+        """
+        self.zpr = self.get_self_energy(
+            mode=False,
+            temperature=False,
+            omega=False,
+            dynamical=False,
+            only_sternheimer=False,
+            only_active=True,
+            only_ddw=True,
+            ).real
+        return self.zpr
