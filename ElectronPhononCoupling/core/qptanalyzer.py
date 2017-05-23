@@ -32,6 +32,9 @@ class QptAnalyzer(object):
                  omegase=None,
                  asr=True,
                  mu=None,
+                 double_smearing = False,
+                 smearing_large = 0.00367,
+                 smearing_width = 0.0367,
                  ):
 
         # Files
@@ -51,6 +54,10 @@ class QptAnalyzer(object):
         self.omegase = omegase if omegase else list()
         self.temperatures = temperatures if temperatures else list()
         self.mu = mu
+
+        self.double_smearing = double_smearing
+        self.smearing_large = smearing_large
+        self.smearing_width = smearing_width
 
     @property
     def nkpt(self):
@@ -196,6 +203,45 @@ class QptAnalyzer(object):
         at all k+q points available. Assuming a gapped system.
         """
         return (self.get_max_val() + self.get_min_cond()) / 2.0
+
+    def get_eta(self, omega_se):
+        """
+        Get the imaginary broadening parameter,
+        which may depend on frequency. 
+        
+        Returns: eta[nkpt, nband, nomegase]
+        """
+
+        # nkpt, nband
+        occ0 = self.eig0.get_fermi_function_T0(self.mu)[0,:,:]
+
+        # nkpt, nband
+        signs = (2 * occ0 - 1)
+
+        nomegase = len(omega_se)
+        values = np.zeros(nomegase, dtype=float)
+        abso = np.abs(omega_se)
+
+        if self.double_smearing:
+
+            eta1 = self.smearing
+            eta2 = self.smearing_large
+            w = self.smearing_width
+
+            for i, o in enumerate(abso):
+
+                if o > w:
+                    values[i] = eta2
+                else:
+                    values[i] = eta1 + (eta2-eta1) * o / w
+
+        else:
+            values[:] = self.smearing
+
+        eta = einsum('kn,l->knl', signs, values) * 1j 
+
+        return eta
+
 
     @staticmethod
     def reduce_array(arr, mode=False, temperature=False, omega=False):
@@ -435,7 +481,10 @@ class QptAnalyzer(object):
               + einsum('knt,o->knot', occ[0,:,:,:], ones(nmode)))
 
         # nkpt, nband
-        eta = (2 * occ0 - 1) * self.smearing * 1j
+        #eta = (2 * occ0 - 1) * self.smearing * 1j
+
+        # nkpt, nband, nomegase
+        eta = self.get_eta(omega_se)
 
         for jband in range(nband):
 
@@ -443,11 +492,14 @@ class QptAnalyzer(object):
             delta_E = (
                 self.eig0.EIG[0,:,:].real
               - einsum('k,n->kn', self.eigq.EIG[0,:,jband].real, ones(nband))
-              - eta)
+              )
     
             # nkpt, nband, nomegase
-            delta_E_omega = (einsum('kn,l->knl', delta_E, ones(nomegase))
-                           + einsum('kn,l->knl', ones((nkpt,nband)), omega_se))
+            delta_E_omega = (
+                  einsum('kn,l->knl', delta_E, ones(nomegase))
+                + einsum('kn,l->knl', ones((nkpt,nband)), omega_se)
+                - eta
+                )
     
             # nkpt, nband, nomegase, nmode
             deno1 = (einsum('knl,o->knlo', delta_E_omega, ones(nmode))
