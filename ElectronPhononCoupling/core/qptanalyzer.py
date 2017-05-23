@@ -33,8 +33,9 @@ class QptAnalyzer(object):
                  asr=True,
                  mu=None,
                  double_smearing = False,
-                 smearing_large = 0.00367,
                  smearing_width = 0.0367,
+                 smearing_above = 0.00367,
+                 smearing_below = 0.00367,
                  ):
 
         # Files
@@ -56,8 +57,9 @@ class QptAnalyzer(object):
         self.mu = mu
 
         self.double_smearing = double_smearing
-        self.smearing_large = smearing_large
         self.smearing_width = smearing_width
+        self.smearing_above = smearing_above
+        self.smearing_below = smearing_below
 
     @property
     def nkpt(self):
@@ -220,20 +222,25 @@ class QptAnalyzer(object):
 
         nomegase = len(omega_se)
         values = np.zeros(nomegase, dtype=float)
-        abso = np.abs(omega_se)
+        #abso = np.abs(omega_se)
 
         if self.double_smearing:
 
-            eta1 = self.smearing
-            eta2 = self.smearing_large
+            eta1 = self.smearing_below
+            eta2 = self.smearing
+            eta3 = self.smearing_above
             w = self.smearing_width
 
-            for i, o in enumerate(abso):
+            for i, o in enumerate(omega_se):
 
-                if o > w:
-                    values[i] = eta2
+                if o < -w:
+                    values[i] = eta1
+                elif o <= 0.:
+                    values[i] = eta2 + (eta1-eta2) * abs(o) / w
+                elif o < w:
+                    values[i] = eta2 + (eta3-eta2) * abs(o) / w
                 else:
-                    values[i] = eta1 + (eta2-eta1) * o / w
+                    values[i] = eta3
 
         else:
             values[:] = self.smearing

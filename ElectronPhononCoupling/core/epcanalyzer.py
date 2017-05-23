@@ -73,8 +73,9 @@ class EpcAnalyzer(object):
                  fermi_level = None,
 
                  double_smearing = False,
-                 smearing_large = 0.00367,
                  smearing_width = 0.0367,
+                 smearing_above = 0.00367,
+                 smearing_below = 0.00367,
 
                  # File names
                  rootname='epc.out',
@@ -152,8 +153,9 @@ class EpcAnalyzer(object):
             gkk0_fname=gkk0,
             asr=asr,
             double_smearing = double_smearing,
-            smearing_large = smearing_large,
             smearing_width = smearing_width,
+            smearing_above = smearing_above,
+            smearing_below = smearing_below,
             )
 
         # Read the first DDB and check that it is Gamma
