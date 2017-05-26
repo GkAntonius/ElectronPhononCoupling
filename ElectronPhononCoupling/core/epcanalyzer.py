@@ -46,6 +46,10 @@ class EpcAnalyzer(object):
     temperature_dependent_broadening = None
     zero_point_renormalization_modes = None
 
+    self_energy = None
+    self_energy_T = None
+    self_energy_static = None
+
 
     split_fan_ddw = False
     renormalization_is_dynamical = False
@@ -174,7 +178,7 @@ class EpcAnalyzer(object):
         self.set_temp_range(temp_range)
         self.set_omega_range(omega_range)
         self.set_smearing(smearing)
-        self.set_output(rootname)
+        self.set_rootname(rootname)
 
         # Split the workload between workers
         # (needed to find the fermi level)
@@ -190,15 +194,15 @@ class EpcAnalyzer(object):
 
     @property
     def nc_output(self):
-        return str(self.output) + '_EP.nc'
+        return str(self.rootname) + '_EP.nc'
 
     @property
     def ren_dat(self):
-        return str(self.output) + '_REN.dat'
+        return str(self.rootname) + '_REN.dat'
 
     @property
     def BRD_dat(self):
-        return str(self.output) + '_BRD.dat'
+        return str(self.rootname) + '_BRD.dat'
 
     @master_only
     def check_gamma(self):
@@ -246,9 +250,9 @@ class EpcAnalyzer(object):
         self.smearing = smearing_Ha
         self.qptanalyzer.smearing = smearing_Ha
     
-    def set_output(self, root):
+    def set_rootname(self, root):
         """Set the root for output names."""
-        self.output = root
+        self.rootname = root
 
     def set_weights(self, wtq, normalize=True):
         """Set the q-points weights."""
@@ -769,7 +773,7 @@ class EpcAnalyzer(object):
 
     def compute_zp_self_energy(self):
         """
-        Compute the zp frequency-dependent self-energy from one q-point.
+        Compute the zp frequency-dependent self-energy.
     
         The self-energy is evaluated on a frequency mesh 'omegase'
         that is shifted by the bare energies, such that, what is retured is
@@ -782,7 +786,7 @@ class EpcAnalyzer(object):
 
     def compute_td_self_energy(self):
         """
-        Compute the td frequency-dependent self-energy from one q-point.
+        Compute the td frequency-dependent self-energy.
     
         The self-energy is evaluated on a frequency mesh 'omegase'
         that is shifted by the bare energies, such that, what is retured is
@@ -868,6 +872,25 @@ class EpcAnalyzer(object):
         self.self_energy_T = (
           self.sum_qpt_functions_double_grid('get_td_self_energy_sternheimer',
                                              'get_td_self_energy_active'))
+
+    def compute_zp_self_energy_static(self):
+        """
+        Compute the static part of the zp self-energy.
+        This includes the Fan and DDW contribution of the Sternheimer space
+        and the DDW contribution of the active space.
+    
+        """
+        self.distribute_workload()
+        ddw_active = self.sum_qpt_function('get_zpr_ddw_active')
+        sternheimer = self.sum_qpt_function('get_zpr_static_sternheimer')
+
+        if i_am_master:
+            self.self_energy_static = ddw_active + sternheimer
+        else:
+            self.self_energy_static = None
+
+        return self.self_energy_static
+            
 
     @master_only
     def write_netcdf(self):
@@ -1035,6 +1058,16 @@ class EpcAnalyzer(object):
                 # FIXME number of spin
                 self_energy[0,:,:,:,0] = self.self_energy[:,:,:].real
                 self_energy[0,:,:,:,1] = self.self_energy[:,:,:].imag
+
+            # ZSE static
+            data = ds.createVariable(
+                'self_energy_static','d',
+                ('number_of_spins', 'number_of_kpoints',
+                 'max_number_of_states'))
+
+            if self.self_energy_static is not None:
+                # FIXME number of spin
+                data[0,:,:] = self.self_energy_static[:,:].real
 
             # TSE
             self_energy_T = ds.createVariable(
