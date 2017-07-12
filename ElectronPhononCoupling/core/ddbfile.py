@@ -112,7 +112,7 @@ class DdbFile(EpcFile):
     def nmode(self):
         return 3 * self.natom
 
-    def compute_dynmat(self, asr=None):
+    def compute_dynmat(self, asr=None, zero_negative=True):
         """
         Diagonalize the dynamical matrix.
     
@@ -172,10 +172,11 @@ class DdbFile(EpcFile):
             eigvect[ipert] = eigvect[ipert] * np.sqrt(me_amu / amu[ii])
 
         # Nullify imaginary frequencies
-        for i, eig in enumerate(eigval):
-          if eig < 0.0:
-            warnings.warn("An eigenvalue is negative with value: {} ... but proceed with value 0.0".format(jj))
-            eigval[i] = 0.0
+        if zero_negative:
+            for i, eig in enumerate(eigval):
+              if eig < 0.0:
+                warnings.warn("An eigenvalue is negative with value: {} ... but proceed with value 0.0".format(jj))
+                eigval[i] = 0.0
 
         # Impose the accoustic sum rule
         if asr and self.is_gamma:
