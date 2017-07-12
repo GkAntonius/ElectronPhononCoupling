@@ -185,7 +185,7 @@ class DdbFile(EpcFile):
           eigval[2] = 0.0
 
         # Frequencies
-        self.omega = np.sqrt(eigval)
+        self.omega = np.sqrt(np.abs(eigval)) * np.sign(eigval)
         self.eigvect = eigvect
     
         return self.omega, self.eigvect
