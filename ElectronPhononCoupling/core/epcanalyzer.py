@@ -382,12 +382,22 @@ class EpcAnalyzer(object):
     def active_worker(self):
         return bool(self.my_iqpts)
 
-    def get_active_ranks(self):
+    def get_active_ranks(self,fine=False):
         """Get the ranks of all active workers."""
-        max_nqpt_per_worker = (self.nqpt // size
-                               + min(self.nqpt % size, 1))
-        n_active_workers = (self.nqpt // max_nqpt_per_worker
-                            + min(self.nqpt % max_nqpt_per_worker, 1))
+    
+        if fine:
+           nqpt = self.nqpt_fine
+        else:
+           nqpt = self.nqpt
+ 
+        #max_nqpt_per_worker = (self.nqpt // size
+        #                       + min(self.nqpt % size, 1))
+        #n_active_workers = (self.nqpt // max_nqpt_per_worker
+        #                    + min(self.nqpt % max_nqpt_per_worker, 1))
+        max_nqpt_per_worker = (nqpt // size
+                               + min(nqpt % size, 1))
+        n_active_workers = (nqpt // max_nqpt_per_worker
+                            + min(nqpt % max_nqpt_per_worker, 1))
         return np.arange(n_active_workers)
 
     @mpi_watch
@@ -399,7 +409,8 @@ class EpcAnalyzer(object):
 
         if i_am_master:
             total = partial_sum
-            active_ranks = self.get_active_ranks()
+            #active_ranks = self.get_active_ranks()
+            active_ranks = self.get_active_ranks(fine)
             if len(active_ranks) > 1:
                 for irank in active_ranks[1:]:
                     partial_sum = comm.recv(source=irank, tag=irank)
@@ -593,7 +604,7 @@ class EpcAnalyzer(object):
         sum_coarse = self.sum_qpt_function(func_coarse, fine=False)
 
         self.distribute_workload(fine=True)
-        self.read_zero_files()
+        #self.read_zero_files()
         sum_fine = self.sum_qpt_function(func_fine, fine=True)
 
         if i_am_master:
@@ -1138,6 +1149,8 @@ class EpcAnalyzer(object):
                     .real * Ha2eV)
                     f.write("{:>8.1f}  {:>12.8f}\n".format(T, ren))
 
+        return
+
     @master_only
     def write_broadening(self):
         """Write the computed broadening in a text file."""
@@ -1170,3 +1183,4 @@ class EpcAnalyzer(object):
                            .real * Ha2eV)
                     f.write("{:>8.1f}  {:>12.8f}\n".format(T, brd))
 
+        return
