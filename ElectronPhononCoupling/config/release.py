@@ -13,7 +13,7 @@ __all__ = [
     ]
 
 
-__version__ = '4.3.2'
+__version__ = '4.4.0'
 
 name = "ElectronPhononCoupling"
 

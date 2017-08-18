@@ -902,6 +902,19 @@ class EpcAnalyzer(object):
 
         return self.self_energy_static
             
+    def compute_zp_self_energy_static_double_grid(self):
+        """
+        Compute the static part of the zp self-energy.
+        This includes the Fan and DDW contribution of the Sternheimer space
+        and the DDW contribution of the active space.
+    
+        """
+        self.self_energy_static = (
+            self.sum_qpt_functions_double_grid('get_zpr_static_sternheimer',
+                                               'get_zpr_ddw_active'))
+
+        return self.self_energy_static
+            
 
     @master_only
     def write_netcdf(self):
