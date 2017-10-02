@@ -221,6 +221,14 @@ class EpcAnalyzer(object):
         # Broadcast
         self.qptanalyzer.broadcast_zero_files()
 
+    @property
+    def nomegase(self):
+        return len(self.omegase)
+
+    @property
+    def ntemp(self):
+        return len(self.temperatures)
+
     def set_temp_range(self, temp_range=(0, 0, 1)):
         """Set the minimum, maximum and step temperature."""
         args = list(temp_range)
@@ -230,7 +238,6 @@ class EpcAnalyzer(object):
             if (maximum - minimum) % step == 0:
                 maximum += 1
         self.temperatures = np.arange(minimum, maximum, step, dtype=float)
-        self.ntemp = len(self.temperatures)
         self.qptanalyzer.temperatures = self.temperatures
 
     def check_temperatures(self):
@@ -242,7 +249,6 @@ class EpcAnalyzer(object):
     def set_omega_range(self, omega_range=(0, 0, 1)):
         """Set the minimum, makimum and step frequency for the self-energy."""
         self.omegase = np.arange(*omega_range, dtype=float)
-        self.nomegase = len(self.omegase)
         self.qptanalyzer.omegase = self.omegase
 
     def set_smearing(self, smearing_Ha):
