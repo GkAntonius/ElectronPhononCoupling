@@ -13,6 +13,7 @@ import netCDF4 as nc
 from .mpi import MPI, comm, size, rank, mpi_watch
 
 from .constants import tol5, tol6, me_amu, kb_HaK
+from .functions import get_bose
 from . import EpcFile
 
 __all__ = ['DdbFile']
@@ -263,22 +264,9 @@ class DdbFile(EpcFile):
 
         bose = zeros((3*self.natom, len(temperatures)))
 
+        #bose[:,:] = get_bose(self.omega, temperatures)
         for imode, omega in enumerate(self.omega):
-            omega = omega.real
-            if omega < tol6:
-                continue
-
-            for tt, T in enumerate(temperatures):
-
-                if T < tol6:
-                    continue
-
-                x = omega / (kb_HaK * T)
-
-                if x > 50.:
-                    continue
-
-                bose[imode,tt] = 1. / (np.exp(x) - 1)
+            bose[imode,:] = get_bose(omega, temperatures)
 
         return bose
 
