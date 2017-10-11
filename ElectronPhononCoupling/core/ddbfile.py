@@ -30,6 +30,16 @@ class DdbFile(EpcFile):
         self.asr = kwargs.pop('asr', True)
         super(DdbFile, self).__init__(*args, **kwargs)
 
+    def set_amu(self, amu):
+        """
+        Set the values for the atom masses.
+
+        Arguments:
+            amu: [ntypat]
+                Atom masses for each atom type, in atomic mass units.
+        """
+        self.amu = np.array(amu)
+
     def read_nc(self, fname=None):
         """Open the DDB.nc file and read it."""
         fname = fname if fname else self.fname

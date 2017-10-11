@@ -30,6 +30,7 @@ class QptAnalyzer(object):
                  smearing=0.00367,
                  temperatures=None,
                  omegase=None,
+                 amu=None,
                  asr=True,
                  mu=None,
                  double_smearing = False,
@@ -55,6 +56,7 @@ class QptAnalyzer(object):
         self.omegase = omegase if omegase else list()
         self.temperatures = temperatures if temperatures else list()
         self.mu = mu
+        self.amu = amu
 
         self.double_smearing = double_smearing
         self.smearing_width = smearing_width
@@ -126,15 +128,20 @@ class QptAnalyzer(object):
             if f.fname:
                 f.read_nc()
 
+        if self.amu is not None:
+            self.ddb.set_amu(self.amu)
+
         self.ddb.compute_dynmat()
 
     def read_ddb(self):
         """Read the ddb and diagonalize the matrix, setting omega."""
         self.ddb.read_nc()
+        if self.amu is not None:
+            self.ddb.set_amu(self.amu)
         self.ddb.compute_dynmat()
 
     def read_zero_files(self):
-        """Read all nc files that are not specifically related to q=0."""
+        """Read all nc files that are related to q=0."""
         for f in (self.eig0, self.eigr2d0, self.fan0, self.gkk0):
             if f.fname:
                 f.read_nc()

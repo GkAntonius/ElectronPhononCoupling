@@ -75,6 +75,7 @@ class EpcAnalyzer(object):
                  omega_range=[0,0,1],
                  smearing=0.00367,
                  fermi_level = None,
+                 amu = None,
 
                  double_smearing = False,
                  smearing_width = 0.0367,
@@ -156,6 +157,7 @@ class EpcAnalyzer(object):
             fan0_fname=fan0,
             gkk0_fname=gkk0,
             asr=asr,
+            amu=amu,
             double_smearing = double_smearing,
             smearing_width = smearing_width,
             smearing_above = smearing_above,
