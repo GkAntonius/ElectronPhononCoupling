@@ -123,6 +123,26 @@ class DdbFile(EpcFile):
     def nmode(self):
         return 3 * self.natom
 
+    def get_mass_scaled_dynmat(self):
+
+        dynmat = np.zeros((self.natom, self.ncart,
+                           self.natom, self.ncart), dtype=np.complex)
+
+        for iat in range(self.natom):
+
+            ityp = self.typat[iat]
+            M_i = self.amu[ityp-1]
+
+            for jat in range(self.natom):
+
+                jtyp = self.typat[jat]
+                M_j = self.amu[jtyp-1]
+
+                dynmat[iat,:,jat,:] = self.E2D[iat,:,jat,:] / np.sqrt(M_i*M_j)
+
+        return dynmat
+                                        
+
     def compute_dynmat(self, asr=None, zero_negative=True):
         """
         Diagonalize the dynamical matrix.
