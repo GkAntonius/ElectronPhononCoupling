@@ -123,6 +123,50 @@ class DdbFile(EpcFile):
     def nmode(self):
         return 3 * self.natom
 
+    def get_mass_scaled_dynmat_cart(self):
+        """
+        Format the dynamical matrix in a 3Nx3N matrix,
+        scale with masses, and transform into Cartesian coordinates.
+        """
+        # Retrive the amu for each atom
+        amu = zeros(self.natom)
+        for ii in np.arange(self.natom):
+          jj = self.typat[ii]
+          amu[ii] = self.amu[jj-1]
+    
+        # Transform from 2nd-order matrix (non-cartesian coordinates, 
+        # masses not included, asr not included ) from self to
+        # dynamical matrix, in cartesian coordinates, asr not imposed.
+        E2D_cart = zeros((3,self.natom,3,self.natom),dtype=complex)
+        for ii in np.arange(self.natom):
+          for jj in np.arange(self.natom):
+            for dir1 in np.arange(3):
+              for dir2 in np.arange(3):
+                for dir3 in np.arange(3):
+                  for dir4 in np.arange(3):
+                    E2D_cart[dir1,ii,dir2,jj] += (self.E2D[ii,dir3,jj,dir4] *
+                            self.gprimd[dir1,dir3] * self.gprimd[dir2,dir4])
+
+        # Reduce the 4 dimensional E2D_cart matrice to 2 dimensional Dynamical matrice
+        # with scaled masses.
+        Dyn_mat = zeros((3*self.natom,3*self.natom),dtype=complex)
+        for ii in np.arange(self.natom):
+          for dir1 in np.arange(3):
+            ipert1 = ii * 3 + dir1
+            for jj in np.arange(self.natom):
+              for dir2 in np.arange(3):
+                ipert2 = jj * 3 + dir2
+
+                Dyn_mat[ipert1,ipert2] = (E2D_cart[dir1,ii,dir2,jj] *
+                                          me_amu / np.sqrt(amu[ii]*amu[jj]))
+    
+        # Hermitianize the dynamical matrix
+        dynmat = np.matrix(Dyn_mat)
+        dynmat = 0.5 * (dynmat + dynmat.transpose().conjugate())
+
+        return dynmat
+
+
     def get_mass_scaled_dynmat(self):
 
         dynmat = np.zeros((self.natom, self.ncart,
@@ -159,42 +203,10 @@ class DdbFile(EpcFile):
           jj = self.typat[ii]
           amu[ii] = self.amu[jj-1]
     
-        # Transform from 2nd-order matrix (non-cartesian coordinates, 
-        # masses not included, asr not included ) from self to
-        # dynamical matrix, in cartesian coordinates, asr not imposed.
-        E2D_cart = zeros((3,self.natom,3,self.natom),dtype=complex)
-        for ii in np.arange(self.natom):
-          for jj in np.arange(self.natom):
-            for dir1 in np.arange(3):
-              for dir2 in np.arange(3):
-                for dir3 in np.arange(3):
-                  for dir4 in np.arange(3):
-                    E2D_cart[dir1,ii,dir2,jj] += (self.E2D[ii,dir3,jj,dir4] *
-                            self.gprimd[dir1,dir3] * self.gprimd[dir2,dir4])
-
-        # DEBUG
-        #print(repr(E2D_cart))
-        # END DEBUG
-    
-        # Reduce the 4 dimensional E2D_cart matrice to 2 dimensional Dynamical matrice
-        # with scaled masses.
-        Dyn_mat = zeros((3*self.natom,3*self.natom),dtype=complex)
-        for ii in np.arange(self.natom):
-          for dir1 in np.arange(3):
-            ipert1 = ii * 3 + dir1
-            for jj in np.arange(self.natom):
-              for dir2 in np.arange(3):
-                ipert2 = jj * 3 + dir2
-
-                Dyn_mat[ipert1,ipert2] = (E2D_cart[dir1,ii,dir2,jj] *
-                                          me_amu / np.sqrt(amu[ii]*amu[jj]))
-    
-        # Hermitianize the dynamical matrix
-        dynmat = np.matrix(Dyn_mat)
-        dynmat = 0.5 * (dynmat + dynmat.transpose().conjugate())
+        dynmat = self.get_mass_scaled_dynmat_cart()
     
         # Diagonalize the matrix
-        eigval, eigvect = np.linalg.eigh(Dyn_mat)
+        eigval, eigvect = np.linalg.eigh(dynmat)
     
         # Scale the eigenvectors 
         for ii in np.arange(self.natom):
