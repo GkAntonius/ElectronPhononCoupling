@@ -49,6 +49,8 @@ class GkkFile(EpcFile):
             self.GKK = np.zeros((self.nkpt, self.nsppol*self.nband, 3, self.natom, self.nband), dtype=np.complex)
             self.GKK.real[...] = GKKtmp2[:, ::2, ...]
             self.GKK.imag[...] = GKKtmp2[:, 1::2, ...]
+
+            # Now the second band index "n" refers to the state at "k+q,n"
             self.GKK = np.reshape(self.GKK,(self.nkpt,self.nsppol,self.nband,3,self.natom,self.nband))
 
     def get_gkk_squared(self):

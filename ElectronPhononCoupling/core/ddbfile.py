@@ -161,30 +161,32 @@ class DdbFile(EpcFile):
                                           me_amu / np.sqrt(amu[ii]*amu[jj]))
     
         # Hermitianize the dynamical matrix
-        dynmat = np.matrix(Dyn_mat)
+        #dynmat = np.matrix(Dyn_mat)
+        dynmat = Dyn_mat
         dynmat = 0.5 * (dynmat + dynmat.transpose().conjugate())
 
         return dynmat
 
 
-    def get_mass_scaled_dynmat(self):
+    def get_E2D_cart(self):
+        """
+        Transform the 2nd-order matrix from non-cartesian coordinates
+        to cartesian coordinates...and also swap atom and cartesian indicies.
+        """
+        # Transform from 2nd-order matrix (non-cartesian coordinates, 
+        # masses not included, asr not included ) from self to
+        # dynamical matrix, in cartesian coordinates, asr not imposed.
+        E2D_cart = zeros((3,self.natom,3,self.natom),dtype=complex)
+        for ii in np.arange(self.natom):
+          for jj in np.arange(self.natom):
+            for dir1 in np.arange(3):
+              for dir2 in np.arange(3):
+                for dir3 in np.arange(3):
+                  for dir4 in np.arange(3):
+                    E2D_cart[dir1,ii,dir2,jj] += (self.E2D[ii,dir3,jj,dir4] *
+                            self.gprimd[dir1,dir3] * self.gprimd[dir2,dir4])
 
-        dynmat = np.zeros((self.natom, self.ncart,
-                           self.natom, self.ncart), dtype=np.complex)
-
-        for iat in range(self.natom):
-
-            ityp = self.typat[iat]
-            M_i = self.amu[ityp-1]
-
-            for jat in range(self.natom):
-
-                jtyp = self.typat[jat]
-                M_j = self.amu[jtyp-1]
-
-                dynmat[iat,:,jat,:] = self.E2D[iat,:,jat,:] / np.sqrt(M_i*M_j)
-
-        return dynmat
+        return E2D_cart
                                         
 
     def compute_dynmat(self, asr=None, zero_negative=True):
