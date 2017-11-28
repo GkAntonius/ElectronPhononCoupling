@@ -171,10 +171,10 @@ class EpcAnalyzer(object):
         self.read_zero_files()
 
         # Get arrays dimensions
-        self.nkpt = self.qptanalyzer.eigr2d0.nkpt
-        self.nband = self.qptanalyzer.eigr2d0.nband
-        self.natom = self.qptanalyzer.eigr2d0.natom
-        self.kpts = self.qptanalyzer.eigr2d0.kpt[:,:]
+        #self.nkpt = self.qptanalyzer.nkpt
+        #self.nband = self.qptanalyzer.nband
+        #self.natom = self.qptanalyzer.natom
+        #self.kpts = self.qptanalyzer.kpts[:,:]
 
         # Set parameters
         self.set_temp_range(temp_range)
@@ -222,6 +222,22 @@ class EpcAnalyzer(object):
 
         # Broadcast
         self.qptanalyzer.broadcast_zero_files()
+
+    @property
+    def nkpt(self):
+        return self.qptanalyzer.nkpt
+
+    @property
+    def nband(self):
+        return self.qptanalyzer.nband
+
+    @property
+    def natom(self):
+        return self.qptanalyzer.natom
+
+    @property
+    def kpts(self):
+        return self.qptanalyzer.kpts
 
     @property
     def nomegase(self):

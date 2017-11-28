@@ -75,6 +75,17 @@ class QptAnalyzer(object):
             raise Exception("Don't know nkpt. No files to read.")
 
     @property
+    def kpts(self):
+        if self.eigr2d.fname:
+            return self.eigr2d.kpt
+        elif self.fan.fname:
+            return self.fan.kpt
+        elif self.gkk.fname:
+            return self.gkk.kpt
+        else:
+            raise Exception("Don't know kpt. No files to read.")
+
+    @property
     def nband(self):
         if self.eigr2d.fname:
             return self.eigr2d.nband
