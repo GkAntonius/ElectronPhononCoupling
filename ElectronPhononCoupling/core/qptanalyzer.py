@@ -1039,6 +1039,23 @@ class QptAnalyzer(object):
         # nmode, nkpt, nband
         return self.zpr  # FIXME use self.zpr_mode?
 
+    def get_zpr_dynamical_modes(self):
+        """
+        Compute the q-point zpr contribution in a dynamical scheme,
+        with the transitions split between active and sternheimer.
+        Retain the mode decomposition of the zpr.
+        """
+        self.zpr = self.get_self_energy(
+            mode=True,
+            temperature=False,
+            omega=False,
+            dynamical=True,
+            only_sternheimer=False,
+            only_active=False,
+            ).real
+        # nmode, nkpt, nband
+        return self.zpr  # FIXME use self.zpr_mode?
+
     def get_zpb_dynamical(self):
         """
         Compute the zp broadening contribution from one q-point in a dynamical scheme.

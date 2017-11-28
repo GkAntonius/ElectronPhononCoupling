@@ -811,6 +811,17 @@ class EpcAnalyzer(object):
             self.sum_qpt_function('get_zpr_static_modes'))
         self.renormalization_is_dynamical = False
 
+    def compute_dynamical_zp_renormalization_modes(self):
+        """
+        Compute the zero-point renormalization in a static scheme
+        with the transitions split between active and sternheimer.
+        Retain the mode decomposition of the zpr.
+        """
+        self.distribute_workload()
+        self.zero_point_renormalization_modes = (
+            self.sum_qpt_function('get_zpr_dynamical_modes'))
+        self.renormalization_is_dynamical = True
+
     def compute_zp_self_energy(self):
         """
         Compute the zero-point frequency-dependent self-energy.
