@@ -105,9 +105,6 @@ class EpcAnalyzer(object):
         if not eigk_fname:
             raise Exception('Must provide a file for eigk_fname')
 
-        if not eigr2d_fnames:
-            raise Exception('Must provide at least one file for eigr2d_fnames')
-
         if not ddb_fnames:
             raise Exception('Must provide at least one file for ddb_fnames')
 
@@ -137,6 +134,7 @@ class EpcAnalyzer(object):
 
         # Initialize a single QptAnalyzer for q=0
 
+        # Select first gkk file
         if self.gkk_fnames:
             gkk0 = self.gkk_fnames[0]
         elif self.gkk_fine_fnames:
@@ -144,16 +142,29 @@ class EpcAnalyzer(object):
         else:
             gkk0 = None
 
+        # Select first fan file
         if self.fan_fnames:
             fan0 = self.fan_fnames[0]
         else:
             fan0 = None
 
+        # Select first eigr2d file
+        if self.eigr2d_fnames:
+            eigr2d0 = self.eigr2d_fnames[0]
+        else:
+            eigr2d0 = None
+
+        # Select first ddb file
+        if self.ddb_fnames:
+            ddb0 = self.ddb_fnames[0]
+        else:
+            ddb0 = None  # I suppose other things will break...
+
         self.qptanalyzer = QptAnalyzer(
             wtq=self.wtq[0],
             eigk_fname=self.eig0_fname,
-            ddb_fname=self.ddb_fnames[0],
-            eigr2d0_fname=self.eigr2d_fnames[0],
+            ddb_fname=ddb0,
+            eigr2d0_fname=eigr2d0,
             fan0_fname=fan0,
             gkk0_fname=gkk0,
             asr=asr,
@@ -170,12 +181,6 @@ class EpcAnalyzer(object):
         # Read other files at q=0 and broadcast the data
         self.read_zero_files()
 
-        # Get arrays dimensions
-        #self.nkpt = self.qptanalyzer.nkpt
-        #self.nband = self.qptanalyzer.nband
-        #self.natom = self.qptanalyzer.natom
-        #self.kpts = self.qptanalyzer.kpts[:,:]
-
         # Set parameters
         self.set_temp_range(temp_range)
         self.set_omega_range(omega_range)
@@ -183,7 +188,7 @@ class EpcAnalyzer(object):
         self.set_rootname(rootname)
 
         # Split the workload between workers
-        # (needed to find the fermi level)
+        # (needed here to find the fermi level)
         self.distribute_workload()
 
         # Set the fermi level
@@ -808,7 +813,7 @@ class EpcAnalyzer(object):
 
     def compute_zp_self_energy(self):
         """
-        Compute the zp frequency-dependent self-energy.
+        Compute the zero-point frequency-dependent self-energy.
     
         The self-energy is evaluated on a frequency mesh 'omegase'
         that is shifted by the bare energies, such that, what is retured is
@@ -821,7 +826,7 @@ class EpcAnalyzer(object):
 
     def compute_td_self_energy(self):
         """
-        Compute the td frequency-dependent self-energy.
+        Compute the temperature-dependent frequency-dependent self-energy.
     
         The self-energy is evaluated on a frequency mesh 'omegase'
         that is shifted by the bare energies, such that, what is retured is
@@ -910,7 +915,7 @@ class EpcAnalyzer(object):
 
     def compute_zp_self_energy_static(self):
         """
-        Compute the static part of the zp self-energy.
+        Compute the static part of the zero-point self-energy.
         This includes the Fan and DDW contribution of the Sternheimer space
         and the DDW contribution of the active space.
     
@@ -928,7 +933,7 @@ class EpcAnalyzer(object):
             
     def compute_zp_self_energy_static_double_grid(self):
         """
-        Compute the static part of the zp self-energy.
+        Compute the static part of the zero-point self-energy.
         This includes the Fan and DDW contribution of the Sternheimer space
         and the DDW contribution of the active space.
     
@@ -939,17 +944,57 @@ class EpcAnalyzer(object):
 
         return self.self_energy_static
             
+    def compute_td_self_energy_active(self):
+        """
+        Compute the temperature-dependent frequency-dependent self-energy
+        from the active part only (GKK), neglecting the Sternheimer part
+        (EIGR2D).
+    
+        The self-energy is evaluated on a frequency mesh 'omegase'
+        that is shifted by the bare energies, such that, what is retured is
+    
+            Simga'_kn(omega,T) = Sigma_kn(omega + E^0_kn,T)
+    
+        """
+        self.distribute_workload()
+        self.self_energy_T = self.sum_qpt_function('get_td_self_energy_active')
+
+    def compute_zp_self_energy_active(self):
+        """
+        Compute the zero-point frequency-dependent self-energy from the active
+        part only (GKK), neglecting the Sternheimer part (EIGR2D).
+    
+        The self-energy is evaluated on a frequency mesh 'omegase'
+        that is shifted by the bare energies, such that, what is retured is
+    
+            Simga'_kn(omega,T) = Sigma_kn(omega + E^0_kn,T)
+    
+        """
+        self.distribute_workload()
+        self.self_energy = self.sum_qpt_function('get_zp_self_energy_active')
 
     @master_only
     def write_netcdf(self):
         """Write all data to a netCDF file."""
+
+        if self.eigr2d_fnames:
+            dim_fname = self.eigr2d_fnames[0]
+        elif self.gkk_fnames:
+            dim_fname = self.gkk_fnames[0]
+        elif self.fan_fnames:
+            dim_fname = self.fan_fnames[0]
+        else:
+            raise Exception('Need at least one file to read the dimensions: ' +
+                            'EIGR2D, GKK, or FAN. ' +
+                            'How did you even get there?')
+
         create_directory(self.nc_output)
 
         # Write on a NC files with etsf-io name convention
         with nc.Dataset(self.nc_output, 'w') as ds:
 
             # Read dim from first EIGR2D file
-            dim = nc.Dataset(self.eigr2d_fnames[0], 'r')
+            dim = nc.Dataset(dim_fname, 'r')
 
             # Determine nsppol from reading occ
             nsppol = len(dim.variables['occupations'][:,0,0])

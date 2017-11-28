@@ -1,5 +1,5 @@
 """
-Compute the zero-point broadening (ZPB)
+Compute the temperature-dependent broadening
 using the dynamical AHC theory (ieig2rf=5).
 """
 
@@ -21,12 +21,6 @@ Calculations/01-LiF-dynamical/odat_calc_DS10_EIG.nc
 Calculations/01-LiF-dynamical/odat_calc_DS14_EIG.nc
 """.split()
 
-eigr2d_fnames = """
-Calculations/01-LiF-dynamical/odat_calc_DS7_EIGR2D.nc
-Calculations/01-LiF-dynamical/odat_calc_DS11_EIGR2D.nc
-Calculations/01-LiF-dynamical/odat_calc_DS15_EIGR2D.nc
-""".split()
-
 gkk_fnames = """
 Calculations/01-LiF-dynamical/odat_calc_DS7_GKK.nc
 Calculations/01-LiF-dynamical/odat_calc_DS11_GKK.nc
@@ -36,7 +30,7 @@ Calculations/01-LiF-dynamical/odat_calc_DS15_GKK.nc
 eigk_fname = 'Calculations/01-LiF-dynamical/odat_calc_DS3_EIG.nc'
 
 
-# Computation of the ZPB
+# Computation of the TDB
 # ======================
 
 epc = compute(
@@ -57,7 +51,6 @@ epc = compute(
     eigk_fname = eigk_fname,        # All the files needed for
     eigq_fnames = eigq_fnames,      # this calculation.
     ddb_fnames = ddb_fnames,        #
-    eigr2d_fnames = eigr2d_fnames,  #
     gkk_fnames = gkk_fnames,        #
     )
 
