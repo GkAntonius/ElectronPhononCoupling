@@ -1005,6 +1005,21 @@ class QptAnalyzer(object):
         self.tdr = einsum('tkn->knt', self.tdr) # FIXME why??
         return self.tdr
 
+    def get_tdr_static_sternheimer(self):
+        """Compute the q-point zpr contribution in a static scheme."""
+
+        self.tdr = self.get_self_energy(
+            mode=False,
+            temperature=True,
+            omega=False,
+            dynamical=False,
+            only_sternheimer=True,
+            only_active=False,
+            ).real
+        # nkpt, nband, ntemp
+        self.tdr = einsum('tkn->knt', self.tdr) # FIXME why??
+        return self.tdr
+
     def get_zpr_dynamical_active(self):
         """
         Compute the q-point contribution to the zero point
@@ -1174,3 +1189,21 @@ class QptAnalyzer(object):
             only_ddw=True,
             ).real
         return self.zpr
+
+    def get_tdr_ddw_active(self):
+        """
+        Compute the q-point zpr contribution in a static scheme
+        with the transitions split between active and sternheimer.
+        """
+        self.tdr = self.get_self_energy(
+            mode=False,
+            temperature=True,
+            omega=False,
+            dynamical=False,
+            only_sternheimer=False,
+            only_active=True,
+            only_ddw=True,
+            ).real
+        # nkpt, nband, ntemp
+        self.tdr = einsum('tkn->knt', self.tdr) # FIXME why??
+        return self.tdr

@@ -49,6 +49,7 @@ class EpcAnalyzer(object):
     self_energy = None
     self_energy_T = None
     self_energy_static = None
+    self_energy_static_T = None
 
 
     split_fan_ddw = False
@@ -941,6 +942,23 @@ class EpcAnalyzer(object):
             self.self_energy_static = None
 
         return self.self_energy_static
+
+    def compute_td_self_energy_static(self):
+        """
+        Compute the static part of the zero-point self-energy.
+        This includes the Fan and DDW contribution of the Sternheimer space
+        and the DDW contribution of the active space.
+        """
+        self.distribute_workload()
+        ddw_active = self.sum_qpt_function('get_tdr_ddw_active')
+        sternheimer = self.sum_qpt_function('get_tdr_static_sternheimer')
+
+        if i_am_master:
+            self.self_energy_static_T = ddw_active + sternheimer
+        else:
+            self.self_energy_static_T = None
+
+        return self.self_energy_static_T
             
     def compute_zp_self_energy_static_double_grid(self):
         """
@@ -1184,6 +1202,16 @@ class EpcAnalyzer(object):
                 # FIXME number of spin
                 self_energy_T[0,:,:,:,:,0] = self.self_energy_T[:,:,:,:].real
                 self_energy_T[0,:,:,:,:,1] = self.self_energy_T[:,:,:,:].imag
+
+            # TSE static
+            data = ds.createVariable(
+                'self_energy_static_T','d',
+                ('number_of_spins', 'number_of_kpoints',
+                 'max_number_of_states', 'number_of_temperature'))
+
+            if self.self_energy_static_T is not None:
+                # FIXME number of spin
+                data[0,:,:,:] = self.self_energy_static_T[:,:,:].real
 
             # ZSF
             spectral_function = ds.createVariable(
