@@ -972,7 +972,20 @@ class EpcAnalyzer(object):
                                                'get_zpr_ddw_active'))
 
         return self.self_energy_static
-            
+        
+    def compute_td_self_energy_static_double_grid(self):
+        """
+        Compute the static part of the td self-energy.
+        This includes the Fan and DDW contribution of the Sternheimer space
+        and the DDW contribution of the active space.
+    
+        """
+        self.self_energy_static_T = (
+            self.sum_qpt_functions_double_grid('get_tdr_static_sternheimer',
+                                               'get_tdr_ddw_active'))
+
+        return self.self_energy_static_T
+    
     def compute_td_self_energy_active(self):
         """
         Compute the temperature-dependent frequency-dependent self-energy
