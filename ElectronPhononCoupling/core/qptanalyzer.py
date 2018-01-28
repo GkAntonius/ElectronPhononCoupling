@@ -526,6 +526,7 @@ class QptAnalyzer(object):
                 - eta
                 )
     
+            # Emission term
             # nkpt, nband, nomegase, nmode
             deno1 = (einsum('knl,o->knlo', delta_E_omega, ones(nmode))
                    - einsum('knl,o->knlo', ones((nkpt,nband,nomegase)), omega_q))
@@ -535,6 +536,7 @@ class QptAnalyzer(object):
     
             del deno1
     
+            # Absorption term
             # nkpt, nband, nomegase, nmode
             deno2 = (einsum('knl,o->knlo', delta_E_omega, ones(nmode))
                    + einsum('knl,o->knlo', ones((nkpt,nband,nomegase)), omega_q))
@@ -560,6 +562,7 @@ class QptAnalyzer(object):
 
     def get_fan_ddw(self, mode=False, temperature=False,
                     omega=False, dynamical=False):
+        """Compute the sum of the fan and the ddw term."""
 
         kwargs = dict(
             mode=mode,
@@ -593,6 +596,10 @@ class QptAnalyzer(object):
                         only_fan=False,
                         only_ddw=False,
                         ):
+        """
+        Compute the self energy with various options to separate the terms
+        into separate fan / ddw, or active / sternheimer.
+        """
 
         if only_sternheimer and only_active:
             raise Exception(
