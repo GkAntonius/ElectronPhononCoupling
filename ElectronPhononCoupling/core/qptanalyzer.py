@@ -267,9 +267,22 @@ class QptAnalyzer(object):
 
         return eta
 
+    @staticmethod
+    def get_se_indices(mode=False, temperature=False, omega=False):
+        """Get the indices string corresponding to the self-energy dimensions"""
+        indices = ''
+        if mode:
+            indices += 'o'
+        if temperature:
+            indices += 't'
+        if omega:
+            indices += 'l'
+        indices += 'kn'
+        return indices
 
     @staticmethod
-    def reduce_array(arr, mode=False, temperature=False, omega=False):
+    def reduce_array(arr, mode=False, temperature=False, omega=False,
+                     shape=None):
         """
         Eliminate dimensions from an array of shape
         (nmode, ntemp, nomegase, nkpt, nband)
@@ -281,22 +294,31 @@ class QptAnalyzer(object):
             Keep the second dimension
         omega:
             Keep the third dimension
+        shape: 'otlkn'
+            Any subset of the initial indices, in any order.
+            Reshaping the array should be avoided if unnecessary.
         """
-        # Find the final order of 
-        final_indices = ''
-        if mode:
-            final_indices += 'o'
-        if temperature:
-            final_indices += 't'
-        if omega:
-            final_indices += 'l'
-        final_indices += 'kn'
 
-        summation = 'otlkn->' + final_indices
+        initial_indices = 'otlkn'
+
+        final_indices = QptAnalyzer.get_se_indices(
+            mode=mode, temperature=temperature, omega=omega)
+
+        if shape is not None:
+
+            if bool(shape.strip(initial_indices)):
+                raise Exception('shape ({}) must be a new combination of ' +
+                                'the intitial indices ({}).'.format(
+                                 shape, initial_indices))
+
+            final_indices = shape
+
+        summation = initial_indices + '->' + final_indices
 
         return einsum(summation, arr)
 
-    def get_fan_ddw_sternheimer(self, mode=False, omega=False, temperature=False):
+    def get_fan_ddw_sternheimer(self,
+        mode=False, omega=False, temperature=False, shape=None):
         """
         Compute the fan and ddw contribution to the self-energy
         obtained from the Sternheimer equation,
@@ -352,9 +374,10 @@ class QptAnalyzer(object):
         ddw = einsum('otkn,l->otlkn', ddw, odep)
 
         # Reduce the arrays
-        fan = self.reduce_array(fan, mode=mode, temperature=temperature, omega=omega)
-        ddw = self.reduce_array(ddw, mode=mode, temperature=temperature, omega=omega)
-
+        fan = self.reduce_array(fan, mode=mode, temperature=temperature,
+                                omega=omega, shape=shape)
+        ddw = self.reduce_array(ddw, mode=mode, temperature=temperature,
+                                omega=omega, shape=shape)
         return fan, ddw
     
     def get_fan_ddw_gkk2_active(self):
@@ -392,7 +415,7 @@ class QptAnalyzer(object):
         return fan, ddw
     
     def get_fan_ddw_active(self, mode=False, omega=False, temperature=False,
-                           dynamical=True):
+                           dynamical=True, shape=None):
         """
         Compute the fan and ddw contributions to the self-energy
         from the active space, that is, the the lower bands.
@@ -486,7 +509,8 @@ class QptAnalyzer(object):
 
         # Reduce the arrays
         ddw = self.reduce_array(ddw, mode=mode,
-                                temperature=temperature, omega=omega)
+                                temperature=temperature, omega=omega,
+                                shape=shape)
 
 
         # Fan term
@@ -556,35 +580,47 @@ class QptAnalyzer(object):
             del div1, div2
       
         # Reduce the arrays
-        fan = self.reduce_array(fan, mode=mode, temperature=temperature, omega=omega)
+        fan = self.reduce_array(fan, mode=mode, temperature=temperature,
+                                omega=omega, shape=shape)
 
         return fan, ddw
 
     def get_fan_ddw(self, mode=False, temperature=False,
-                    omega=False, dynamical=False):
-        """Compute the sum of the fan and the ddw term."""
+                    omega=False, dynamical=False, shape=None):
+        """
+        Compute the sum of the Fan and the Diagonal Debye-Waller term.
+
+        Keyword arguments
+        -----------------
+
+        mode:
+            Keep mode decomposition (additional dimension)
+        temperature:
+            Inlcude temperature depdencente (additional dimension).
+        omega:
+            Inlcude frequency depdencente (additional dimension).
+        dynamical:
+            Use the full dynamical theory by including the phonon frequencies
+            in the location of the poles of the self-energy.
+
+        """
 
         kwargs = dict(
             mode=mode,
             temperature=temperature,
             omega=omega,
-            dynamical=dynamical)
-
-        fan_stern, ddw_stern = self.get_fan_ddw_sternheimer(
-            mode=mode,
-            temperature=temperature,
-            omega=omega,
+            shape=shape,
             )
-        fan_active, ddw_active = self.get_fan_ddw_active(
-            mode=mode,
-            temperature=temperature,
-            omega=omega,
-            dynamical=dynamical)
+
+        fan_stern, ddw_stern = self.get_fan_ddw_sternheimer(**kwargs)
+        fan_active, ddw_active = self.get_fan_ddw_active(dynamical=dynamical,
+                                                         **kwargs)
 
         fan = fan_active + fan_stern
         ddw = ddw_active + ddw_stern
 
         return fan, ddw
+
 
     def get_self_energy(self,
                         mode=False,
@@ -595,36 +631,57 @@ class QptAnalyzer(object):
                         only_active=False,
                         only_fan=False,
                         only_ddw=False,
+                        real=False,
+                        imag=False,
+                        shape=None,
                         ):
         """
         Compute the self energy with various options to separate the terms
         into separate fan / ddw, or active / sternheimer.
+
+        Keyword arguments
+        -----------------
+
+        mode:
+            Keep mode decomposition (additional dimension)
+        temperature:
+            Inlcude temperature depdencente (additional dimension).
+        omega:
+            Inlcude frequency depdencente (additional dimension).
+        dynamical:
+            Use the full dynamical theory by including the phonon frequencies
+            in the location of the poles of the self-energy.
+
+        only_sternheimer:
+            Only include the (frequency independent) Sternheimer part.
+        only_active:
+            Only include the "active" part contribution.
+        only_fan:
+            Only include the (frequency dependent) Fan term.
+        only_ddw:
+            Only include the (frequency independent) diagonal Debye-Waller term.
+
         """
+
+        kwargs = dict(
+            mode=mode,
+            temperature=temperature,
+            omega=omega,
+            #shape=shape,
+            )
 
         if only_sternheimer and only_active:
             raise Exception(
             'only_sternheimer and only_active cannot be True at the same time')
 
         elif only_sternheimer:
-            fan, ddw = self.get_fan_ddw_sternheimer(
-                mode=mode,
-                temperature=temperature,
-                omega=omega,
-                )
+            fan, ddw = self.get_fan_ddw_sternheimer(**kwargs)
 
         elif only_active:
-            fan, ddw = self.get_fan_ddw_active(
-                mode=mode,
-                temperature=temperature,
-                omega=omega,
-                dynamical=dynamical)
+            fan, ddw = self.get_fan_ddw_active(dynamical=dynamical, **kwargs)
 
         else:
-            fan, ddw = self.get_fan_ddw(
-                mode=mode,
-                temperature=temperature,
-                omega=omega,
-                dynamical=dynamical)
+            fan, ddw = self.get_fan_ddw(dynamical=dynamical, **kwargs)
 
         if only_fan:
             se_q = fan
@@ -635,12 +692,24 @@ class QptAnalyzer(object):
 
         se = self.wtq * se_q
         se = self.eig0.make_average(se)
-    
+
+        if real:
+            se = se.real
+        elif imag:
+            se = se.imag
+
+        # Note that we must not reshape before calling eig0.make_average
+        if shape is not None:
+            initial_indices = self.get_se_indices(
+                mode=mode, temperature=temperature, omega=omega)
+            summation = initial_indices + '->' + shape
+            se = einsum(summation, se)
+
         return se
 
 
     def get_broadening(self, mode=False, temperature=False,
-                       omega=False, dynamical=True):
+                       omega=False, dynamical=True, shape=None):
         """
         Compute the zp broadening contribution from one q-point in a dynamical scheme.
         Only take the active space contribution.
@@ -743,10 +812,18 @@ class QptAnalyzer(object):
 
         # Reduce the arrays
         broadening = self.reduce_array(broadening, mode=mode,
-                                       temperature=temperature, omega=omega)
+                                       temperature=temperature,
+                                       omega=omega)
 
         broadening *= self.wtq
         broadening = self.eig0.make_average(broadening)
+
+        # Note that we must not reshape before calling eig0.make_average
+        if shape is not None:
+            initial_indices = self.get_se_indices(
+                mode=mode, temperature=temperature, omega=omega)
+            summation = initial_indices + '->' + shape
+            broadening = einsum(summation, broadening)
 
         return broadening
 
@@ -770,9 +847,8 @@ class QptAnalyzer(object):
             dynamical=True,
             only_sternheimer=False,
             only_active=False,
+            shape='knl'
             )
-        # nkpt, nband, nomegase, nband
-        self.sigma = einsum('lkn->knl', self.sigma) # FIXME why??
         return self.sigma
 
     def get_td_self_energy(self):
@@ -794,9 +870,9 @@ class QptAnalyzer(object):
             dynamical=True,
             only_sternheimer=False,
             only_active=False,
+            shape='knlt',
             )
         # nkpt, nband, nomegase, nband
-        self.sigma = einsum('tlkn->knlt', self.sigma) # FIXME why??
         return self.sigma
 
     def get_zp_self_energy_active(self):
@@ -819,9 +895,8 @@ class QptAnalyzer(object):
             dynamical=True,
             only_sternheimer=False,
             only_active=True,
+            shape='knl',
             )
-        # nkpt, nband, nomegase, nband
-        self.sigma = einsum('lkn->knl', self.sigma) # FIXME why??
         return self.sigma
 
     def get_zp_self_energy_sternheimer(self):
@@ -844,9 +919,8 @@ class QptAnalyzer(object):
             dynamical=True,
             only_sternheimer=True,
             only_active=False,
+            shape='knl',
             )
-        # nkpt, nband, nomegase, nband
-        self.sigma = einsum('lkn->knl', self.sigma) # FIXME why??
         return self.sigma
 
     def get_td_self_energy_active(self):
@@ -869,9 +943,8 @@ class QptAnalyzer(object):
             dynamical=True,
             only_sternheimer=False,
             only_active=True,
+            shape='knlt',
             )
-        # nkpt, nband, nomegase, nband
-        self.sigma = einsum('tlkn->knlt', self.sigma) # FIXME why??
         return self.sigma
 
     def get_td_self_energy_sternheimer(self):
@@ -894,9 +967,8 @@ class QptAnalyzer(object):
             dynamical=True,
             only_sternheimer=True,
             only_active=False,
+            shape='knlt',
             )
-        # nkpt, nband, nomegase, nband
-        self.sigma = einsum('tlkn->knlt', self.sigma) # FIXME why??
         return self.sigma
 
     def get_zpr_static_sternheimer(self):
@@ -909,7 +981,8 @@ class QptAnalyzer(object):
             dynamical=False,
             only_sternheimer=True,
             only_active=False,
-            ).real
+            real=True,
+            )
         return self.zpr
 
     def get_zpr_static(self):
@@ -924,7 +997,8 @@ class QptAnalyzer(object):
             dynamical=False,
             only_sternheimer=False,
             only_active=False,
-            ).real
+            real=True,
+            )
         return self.zpr
 
     def get_zpr_dynamical(self):
@@ -939,7 +1013,8 @@ class QptAnalyzer(object):
             dynamical=True,
             only_sternheimer=False,
             only_active=False,
-            ).real
+            real=True,
+            )
         return self.zpr
 
     def get_tdr_static(self):
@@ -955,9 +1030,9 @@ class QptAnalyzer(object):
             dynamical=False,
             only_sternheimer=False,
             only_active=False,
-            ).real
-        # nkpt, nband, ntemp
-        self.tdr = einsum('tkn->knt', self.tdr) # FIXME why??
+            real=True,
+            shape='knt',
+            )
         return self.tdr
     
     def get_tdr_dynamical(self):
@@ -972,9 +1047,9 @@ class QptAnalyzer(object):
             dynamical=True,
             only_sternheimer=False,
             only_active=False,
-            ).real
-        # nkpt, nband, ntemp
-        self.tdr = einsum('tkn->knt', self.tdr) # FIXME why??
+            real=True,
+            shape='knt',
+            )
         return self.tdr
 
     def get_tdr_static_nosplit(self):
@@ -989,9 +1064,9 @@ class QptAnalyzer(object):
             dynamical=False,
             only_sternheimer=True,
             only_active=False,
-            ).real
-        # nkpt, nband, ntemp
-        self.tdr = einsum('tkn->knt', self.tdr) # FIXME why??
+            real=True,
+            shape='knt',
+            )
         return self.tdr
 
     def get_tdr_dynamical_active(self):
@@ -1007,9 +1082,9 @@ class QptAnalyzer(object):
             dynamical=True,
             only_sternheimer=False,
             only_active=True,
-            ).real
-        # nkpt, nband, ntemp
-        self.tdr = einsum('tkn->knt', self.tdr) # FIXME why??
+            real=True,
+            shape='knt',
+            )
         return self.tdr
 
     def get_tdr_static_sternheimer(self):
@@ -1022,9 +1097,9 @@ class QptAnalyzer(object):
             dynamical=False,
             only_sternheimer=True,
             only_active=False,
-            ).real
-        # nkpt, nband, ntemp
-        self.tdr = einsum('tkn->knt', self.tdr) # FIXME why??
+            real=True,
+            shape='knt',
+            )
         return self.tdr
 
     def get_zpr_dynamical_active(self):
@@ -1040,7 +1115,8 @@ class QptAnalyzer(object):
             dynamical=True,
             only_sternheimer=False,
             only_active=True,
-            ).real
+            real=True,
+            )
         # nkpt, nband, ntemp
         return self.zpr
 
@@ -1057,9 +1133,10 @@ class QptAnalyzer(object):
             dynamical=False,
             only_sternheimer=False,
             only_active=False,
-            ).real
+            real=True,
+            )
         # nmode, nkpt, nband
-        return self.zpr  # FIXME use self.zpr_mode?
+        return self.zpr
 
     def get_zpr_dynamical_modes(self):
         """
@@ -1074,9 +1151,10 @@ class QptAnalyzer(object):
             dynamical=True,
             only_sternheimer=False,
             only_active=False,
-            ).real
+            real=True,
+            )
         # nmode, nkpt, nband
-        return self.zpr  # FIXME use self.zpr_mode?
+        return self.zpr
 
     def get_zpb_dynamical(self):
         """
@@ -1094,9 +1172,13 @@ class QptAnalyzer(object):
         Only take the active space contribution.
         Returns: zpb[nkpt,nband,ntemp]
         """
-        self.tdb = self.get_broadening(mode=False, temperature=True,
-                                       omega=False, dynamical=True)
-        self.tdb = einsum('tkn->knt', self.tdb) # FIXME why??
+        self.tdb = self.get_broadening(
+            mode=False,
+            temperature=True,
+            omega=False,
+            dynamical=True,
+            shape='knt',
+            )
         return self.tdb
     
     def get_zpb_static(self):
@@ -1115,9 +1197,13 @@ class QptAnalyzer(object):
         Only take the active space contribution.
         Returns: zpb[nkpt,nband,ntemp]
         """
-        self.tdb = self.get_broadening(mode=False, temperature=True,
-                                       omega=False, dynamical=False)
-        self.tdb = einsum('tkn->knt', self.tdb) # FIXME why??
+        self.tdb = self.get_broadening(
+            mode=False,
+            temperature=True,
+            omega=False,
+            dynamical=False,
+            shape='knt',
+            )
         return self.tdb
 
     def get_tdb_static_nosplit(self):
@@ -1194,7 +1280,8 @@ class QptAnalyzer(object):
             only_sternheimer=False,
             only_active=True,
             only_ddw=True,
-            ).real
+            real=True,
+            )
         return self.zpr
 
     def get_tdr_ddw_active(self):
@@ -1210,7 +1297,7 @@ class QptAnalyzer(object):
             only_sternheimer=False,
             only_active=True,
             only_ddw=True,
-            ).real
-        # nkpt, nband, ntemp
-        self.tdr = einsum('tkn->knt', self.tdr) # FIXME why??
+            real=True,
+            shape='knt',
+            )
         return self.tdr
