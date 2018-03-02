@@ -393,23 +393,24 @@ class QptAnalyzer(object):
             raise Exception('You should provide GKK files or FAN files '
                             'to compute active space contribution.')
 
-        # Get reduced displacement (scaled with frequency)
-        displ_red_FAN2, displ_red_DDW2 = self.ddb.get_reduced_displ_squared()
-
         if self.use_gkk:
-            gkk2 = self.gkk.get_gkk_squared()
-            gkk02 = self.gkk0.get_gkk_squared()
+
+            #gkk2 = self.gkk.get_gkk_squared()
+            #gkk02 = self.gkk0.get_gkk_squared()
+
+            fan = np.abs(self.gkk.get_gkk_mode(self.ddb)) ** 2
+            ddw = self.gkk0.get_gkk2_DW_mode(self.ddb)
+
         else:
+            # Get reduced displacement (scaled with frequency)
+            displ_red_FAN2, displ_red_DDW2 = self.ddb.get_reduced_displ_squared()
+
             gkk2 = self.fan.FAN
             gkk02 = self.fan0.FAN
 
-        # nkpt, nband, nband, nmode
-        fan = einsum('kniajbm,oabij->knmo', gkk2, displ_red_FAN2)
-        ddw = einsum('kniajbm,oabij->knmo', gkk02, displ_red_DDW2)
-
-        # FIXME This is the proper way of computing it:
-        #       avoid having to store the full gkk2 matrix
-        #fan = np.abs(self.gkk.compute_gkk_mode_basis(self.ddb)) ** 2
+            # nkpt, nband, nband, nmode
+            fan = einsum('kniajbm,oabij->knmo', gkk2, displ_red_FAN2)
+            ddw = einsum('kniajbm,oabij->knmo', gkk02, displ_red_DDW2)
 
         # Enforce the diagonal coupling terms to be zero at Gamma
         ddw = self.eig0.symmetrize_fan_degen(ddw)
