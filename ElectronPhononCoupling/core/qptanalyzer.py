@@ -407,6 +407,10 @@ class QptAnalyzer(object):
         fan = einsum('kniajbm,oabij->knmo', gkk2, displ_red_FAN2)
         ddw = einsum('kniajbm,oabij->knmo', gkk02, displ_red_DDW2)
 
+        # FIXME This is the proper way of computing it:
+        #       avoid having to store the full gkk2 matrix
+        #fan = np.abs(self.gkk.compute_gkk_mode_basis(self.ddb)) ** 2
+
         # Enforce the diagonal coupling terms to be zero at Gamma
         ddw = self.eig0.symmetrize_fan_degen(ddw)
         if self.is_gamma:

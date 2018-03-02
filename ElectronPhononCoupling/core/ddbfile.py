@@ -234,6 +234,39 @@ class DdbFile(EpcFile):
         self.eigvect = eigvect
     
         return self.omega, self.eigvect
+
+    def get_reduced_displ(self):
+        """
+        Compute the mode eigenvectors, scaled by the mode displacements
+        Also transform from cartesian to reduced coordinates.
+
+        Returns: polvec[nmode,3,natom]
+        """
+
+        # Minimal value for omega (Ha)
+        omega_tolerance = 1e-5
+
+        self.polvec = zeros((self.nmode,3,self.natom), dtype=complex)
+        xi_at = zeros(3, dtype=complex)
+
+        omega, eigvect = self.compute_dynmat()
+
+        for imode in range(self.nmode):
+            # Skip mode with zero frequency (leave displacements null)
+            if omega[imode].real < omega_tolerance:
+              continue
+
+            z0 = 1. / np.sqrt(2.0 * omega[imode].real)
+
+            for iatom in np.arange(self.natom):
+                for idir in range(3):
+                    xi_at[idir] = eigvect[3*iatom+idir,imode] * z0
+
+                for idir in range(3):
+                    for jdir in range(3):
+                        self.polvec[imode,idir,iatom] += xi_at[jdir] * self.gprimd[jdir,idir]
+
+        return self.polvec
     
     def get_reduced_displ_squared(self):
         """

@@ -9,6 +9,8 @@ import numpy as np
 from numpy import zeros, einsum
 import netCDF4 as nc
 
+from .ddbfile import DdbFile
+
 from .mpi import MPI, comm, size, rank, mpi_watch
 
 from . import EpcFile
@@ -88,6 +90,33 @@ class GkkFile(EpcFile):
                                            self.GKK[ikpt,0,...].conjugate())
 
         return gkk2
+
+    def compute_gkk_mode_basis(self, ddb):
+        """
+        Convert the gkk from the cartesian/atomic basis to the mode basis.
+
+        The resulting gkk are aslo scaled by the root mean squared displacement
+        of the mode, that is sqrt(hbar/(M omega)).
+
+        Arguments
+        ---------
+        ddb:
+            DdbFile object.
+
+        Returns
+        -------
+
+        GKK_mode: [nkpt, nband, nmode, nband]
+        """
+        assert ddb.nmode == 3 * self.natom
+
+        self.GKK_mode = np.zeros((self.nkpt, self.nsppol*self.nband, ddb.nmode, self.nband), dtype=np.complex)
+
+        polvec = ddb.get_reduced_displ()
+
+        self.GKK_mode = np.einsum('kniam,oia->knmo', self.GKK[:,0,...], polvec)
+
+        return self.GKK_mode
 
 
     @mpi_watch
