@@ -29,8 +29,8 @@ def compute(
         smearing_eV = 0.01,
         temp_range = [0, 600, 50],
         omega_range = [-0.1, 0.1, 0.001],
-        fermi_level = fermi_level,
-        amu = amu,
+        fermi_level = None,
+        amu = None,
 
         # File names
         rootname = 'epc.out',
@@ -219,6 +219,8 @@ def compute(
         temp_range=temp_range,
         omega_range=omega_range,
         smearing=smearing_Ha,
+        fermi_level=fermi_level,
+        amu=amu,
 
         write=write,
         rootname=rootname,
