@@ -29,6 +29,8 @@ def compute(
         smearing_eV = 0.01,
         temp_range = [0, 600, 50],
         omega_range = [-0.1, 0.1, 0.001],
+        fermi_level = fermi_level,
+        amu = amu,
 
         # File names
         rootname = 'epc.out',
@@ -142,8 +144,15 @@ def compute(
     omega_range: ([0,0,1])
         Minimum, maximum and step frequency for the self-energy.
 
+    fermi_level:
+        The fermi energy, in Hartree.
+        Will be read from the files if not specified.
 
-    File names
+    amu: [ntypat]
+        The atomic masses, in amu.
+        Will be read from the files if not specified.
+
+    Film names
     ----------
 
     rootname: ('epc.out')
