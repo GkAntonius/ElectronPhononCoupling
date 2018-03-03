@@ -50,6 +50,7 @@ class EpcAnalyzer(object):
     self_energy_T = None
     self_energy_static = None
     self_energy_static_T = None
+    self_energy_fan_active = None
 
 
     split_fan_ddw = False
@@ -693,6 +694,17 @@ class EpcAnalyzer(object):
                                                'get_zpr_dynamical_active'))
         self.renormalization_is_dynamical = True
 
+    def compute_dynamical_zp_renormalization_modes_double_grid(self):
+        """
+        Compute the temperature-dependent renormalization
+        in a dynamical scheme.
+        """
+        self.check_temperatures()
+        self.zero_point_renormalization_modes = (
+            self.sum_qpt_functions_double_grid('get_zpr_static_sternheimer_modes',
+                                               'get_zpr_dynamical_active_modes'))
+        self.renormalization_is_dynamical = True
+
     def compute_dynamical_zp_renormalization(self):
         """Compute the zero-point renormalization in a dynamical scheme."""
         self.distribute_workload()
@@ -1015,6 +1027,29 @@ class EpcAnalyzer(object):
         self.distribute_workload()
         self.self_energy = self.sum_qpt_function('get_zp_self_energy_active')
 
+    def compute_td_self_energy_static_double_grid(self):
+        """
+        Compute the static part of the td self-energy.
+        This includes the Fan and DDW contribution of the Sternheimer space
+        and the DDW contribution of the active space.
+    
+        """
+        self.self_energy_static_T = (
+            self.sum_qpt_functions_double_grid('get_tdr_static_sternheimer',
+                                               'get_tdr_ddw_active'))
+
+        return self.self_energy_static_T
+
+    def compute_zp_self_energy_fan_active(self):
+        """
+        Compute only the active part of Fan term for check.
+
+        """
+        self.self_energy_fan_active = (
+            self.sum_qpt_function('get_zp_fan_active'))
+
+        return self.self_energy_fan_active
+
     @master_only
     def write_netcdf(self):
         """Write all data to a netCDF file."""
@@ -1193,6 +1228,17 @@ class EpcAnalyzer(object):
                 # FIXME number of spin
                 self_energy[0,:,:,:,0] = self.self_energy[:,:,:].real
                 self_energy[0,:,:,:,1] = self.self_energy[:,:,:].imag
+
+            # ZSE fan active
+            self_energy_fan_active = ds.createVariable('self_energy_fan_active','d',
+                ('number_of_spins', 'number_of_kpoints',
+                 'max_number_of_states', 'number_of_frequencies', 'cplex'))
+
+            if self.self_energy_fan_active is not None:
+
+                # FIXME number of spin
+                self_energy_fan_active[0,:,:,:,0] = self.self_energy_fan_active[:,:,:].real
+                self_energy_fan_active[0,:,:,:,1] = self.self_energy_fan_active[:,:,:].imag
 
             # ZSE static
             data = ds.createVariable(

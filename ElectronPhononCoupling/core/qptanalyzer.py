@@ -990,6 +990,19 @@ class QptAnalyzer(object):
             )
         return self.zpr
 
+    def get_zpr_static_sternheimer_modes(self):
+        """Compute the q-point zpr contribution in a static scheme."""
+
+        self.zpr = self.get_self_energy(
+            mode=True,
+            temperature=False,
+            omega=False,
+            dynamical=False,
+            only_sternheimer=True,
+            only_active=False,
+            ).real
+        return self.zpr
+
     def get_zpr_static(self):
         """
         Compute the q-point zpr contribution in a static scheme,
@@ -1122,6 +1135,23 @@ class QptAnalyzer(object):
             only_active=True,
             real=True,
             )
+        # nkpt, nband, ntemp
+        return self.zpr
+
+    def get_zpr_dynamical_active_modes(self):
+        """
+        Compute the q-point contribution to the zero point
+        renormalization in a dynamical scheme,
+        taking only the active space contribution.
+        """
+        self.zpr = self.get_self_energy(
+            mode=True,
+            temperature=False,
+            omega=False,
+            dynamical=True,
+            only_sternheimer=False,
+            only_active=True,
+            ).real
         # nkpt, nband, ntemp
         return self.zpr
 
@@ -1306,3 +1336,22 @@ class QptAnalyzer(object):
             shape='knt',
             )
         return self.tdr
+
+    def get_zp_fan_active(self):
+        """
+        Compute only the active part of fan term
+        """
+        self.zpaf = self.get_self_energy(
+            mode=False,
+            temperature=False,
+            omega=True,
+            dynamical=True,
+            only_sternheimer=False,
+            only_active=True,
+            only_fan=True,
+            )
+        # nkpt, nband, nomegase, nband
+        self.zpaf = einsum('lkn->knl', self.zpaf) # FIXME why??
+
+        return self.zpaf
+
