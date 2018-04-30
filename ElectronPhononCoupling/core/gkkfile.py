@@ -15,6 +15,8 @@ from .mpi import MPI, comm, size, rank, mpi_watch
 
 from . import EpcFile
 
+from ..util.ncutil import nc_copy
+
 __all__ = ['GkkFile']
 
 
@@ -56,6 +58,38 @@ class GkkFile(EpcFile):
             self.GKK = np.reshape(self.GKK,(self.nkpt,self.nsppol,self.nband,3,self.natom,self.nband))
 
             self.GKK_mode = None
+
+    def write_nc(self, fname, overwrite=False):
+        """
+        Write a new GKK.nc file.
+        Most arrays are directly copied from the original file,
+        except for the gkk matrix elements, which are the ones stored in memory.
+        This function is used when altering the gkk matrix elements.
+        """
+
+        if not overwrite and os.path.exists(fname):
+            raise Exception('File exists: {}\nUse overwrite=True to overwrite'.format(fname))
+
+        with nc.Dataset(fname, 'w') as dsout:
+
+            with nc.Dataset(self.fname, 'r') as dsin:
+
+                nc_copy(dsin, dsout, except_variables=('second_derivative_eigenenergies_actif',))
+
+            data = dsout.createVariable('second_derivative_eigenenergies_actif', np.dtype('float64'),
+                ('max_number_of_states', 'number_of_atoms_for_gkk',
+                 'number_of_cartesian_directions_for_gkk', 'number_of_kpoints',
+                 'product_mband_nsppol2')
+                )
+
+            GKKtmp3 = np.reshape(self.GKK,(self.nkpt, self.nsppol*self.nband, 3, self.natom, self.nband))
+            GKKtmp2 = np.zeros((self.nkpt, 2*self.nsppol*self.nband, 3, self.natom, self.nband), dtype=np.float64)
+            GKKtmp2[:, ::2, ...]  = GKKtmp3.real[...]
+            GKKtmp2[:, 1::2, ...] = GKKtmp3.imag[...]
+            GKKtmp = np.einsum('nokji->ijkno', GKKtmp2)
+
+            data[...] = GKKtmp
+
 
     def get_gkk_squared(self):
         """
@@ -119,6 +153,45 @@ class GkkFile(EpcFile):
         self.GKK_mode = np.einsum('kniam,oia->knmo', self.GKK[:,0,...], polvec)
 
         return self.GKK_mode
+
+    def get_gkk_cart(self, ddb):
+        """
+        Convert the gkk back from the mode basis to the cartesian/atomic basis.
+
+        Arguments
+        ---------
+        ddb:
+            DdbFile object.
+
+        Returns
+        -------
+
+        GKK_mode: [nkpt, nband, nband, nmode]
+        """
+        polvec = ddb.get_reduced_displ()
+
+        polvec_mat =  np.zeros((ddb.nmode, ddb.nmode), dtype=np.complex)
+
+        for imode in range(ddb.nmode):
+            for icart in range(3):
+                for iat in range(self.natom):
+                    polvec_mat[imode,icart+3*iat] = polvec[imode,icart,iat]
+
+        inv_polvec = np.linalg.inv(polvec_mat)
+
+        for ikpt in range(self.nkpt):
+            for iband in range(self.nband):
+                for jband in range(self.nband):
+
+                    GKK_mode = self.GKK_mode[ikpt,iband,jband,:]
+                    GKK_cart = np.dot(inv_polvec, GKK_mode)
+
+                    for icart in range(3):
+                        for iat in range(self.natom):
+
+                            self.GKK[ikpt,0,iband,icart,iat,jband] = (
+                                GKK_cart[icart+3*iat])
+        return self.GKK
 
     def get_gkk2_DW_mode(self, ddb):
         """
