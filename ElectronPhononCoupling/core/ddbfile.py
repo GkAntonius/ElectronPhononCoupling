@@ -235,7 +235,7 @@ class DdbFile(EpcFile):
     
         return self.omega, self.eigvect
 
-    def get_reduced_displ(self):
+    def get_reduced_displ(self, noscale=False):
         """
         Compute the mode eigenvectors, scaled by the mode displacements
         Also transform from cartesian to reduced coordinates.
@@ -253,10 +253,13 @@ class DdbFile(EpcFile):
 
         for imode in range(self.nmode):
             # Skip mode with zero frequency (leave displacements null)
-            if omega[imode].real < omega_tolerance:
+            if omega[imode].real < omega_tolerance and not noscale:
               continue
 
-            z0 = 1. / np.sqrt(2.0 * omega[imode].real)
+            if noscale:
+                z0 = 1.
+            else:
+                z0 = 1. / np.sqrt(2.0 * omega[imode].real)
 
             for iatom in np.arange(self.natom):
                 for idir in range(3):

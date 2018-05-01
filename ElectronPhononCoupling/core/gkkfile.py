@@ -127,17 +127,19 @@ class GkkFile(EpcFile):
 
         return gkk2
 
-    def get_gkk_mode(self, ddb):
+    def get_gkk_mode(self, ddb, noscale=False):
         """
         Convert the gkk from the cartesian/atomic basis to the mode basis.
 
         The resulting gkk are aslo scaled by the root mean squared displacement
-        of the mode, that is sqrt(hbar/(M omega)).
+        of the mode, that is sqrt(hbar/(2 M omega)).
 
         Arguments
         ---------
         ddb:
             DdbFile object.
+        noscale:
+            Do not scale by the root mean squared displacement.
 
         Returns
         -------
@@ -148,13 +150,13 @@ class GkkFile(EpcFile):
 
         self.GKK_mode = np.zeros((self.nkpt, self.nband, self.nband, ddb.nmode), dtype=np.complex)
 
-        polvec = ddb.get_reduced_displ()
+        polvec = ddb.get_reduced_displ(noscale=noscale)
 
         self.GKK_mode = np.einsum('kniam,oia->knmo', self.GKK[:,0,...], polvec)
 
         return self.GKK_mode
 
-    def get_gkk_cart(self, ddb):
+    def get_gkk_cart(self, ddb, noscale=False):
         """
         Convert the gkk back from the mode basis to the cartesian/atomic basis.
 
@@ -162,13 +164,15 @@ class GkkFile(EpcFile):
         ---------
         ddb:
             DdbFile object.
+        noscale:
+            Do not scale by the root mean squared displacement.
 
         Returns
         -------
 
         GKK_mode: [nkpt, nband, nband, nmode]
         """
-        polvec = ddb.get_reduced_displ()
+        polvec = ddb.get_reduced_displ(noscale=noscale)
 
         polvec_mat =  np.zeros((ddb.nmode, ddb.nmode), dtype=np.complex)
 

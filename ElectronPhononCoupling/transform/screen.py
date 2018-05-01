@@ -27,8 +27,7 @@ def screen_gkk(gkkfile, ddbfile, omega, epsilon):
     """
 
     # Compute the g matrix elements in the mode basis
-    if gkkfile.GKK_mode is None:
-        gkkfile.get_gkk_mode(ddbfile)
+    gkkfile.get_gkk_mode(ddbfile, noscale=True)
 
     # Compute the phonon frequencies
     omegaph, evecs = ddbfile.compute_dynmat()
@@ -43,6 +42,6 @@ def screen_gkk(gkkfile, ddbfile, omega, epsilon):
         gkkfile.GKK_mode[...,imode] = gkkfile.GKK_mode[...,imode] * inv_epsilon_ph[imode]
 
     # Transform back the g matrix elements in the atom/cartesian basis
-    gkkfile.get_gkk_cart(ddbfile)
+    gkkfile.get_gkk_cart(ddbfile, noscale=True)
 
 
