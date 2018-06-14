@@ -495,7 +495,10 @@ class EpcAnalyzer(object):
 
     @mpi_watch
     def gather_qpt_function(self, func_name, *args, **kwargs):
-        """Call a certain function or each q-points and gather all results."""
+        """
+        Call a certain function or each q-points and gather all results to master.
+        Other workers get None.
+        """
 
         partial = self.gather_qpt_function_me(func_name, *args, **kwargs)
 

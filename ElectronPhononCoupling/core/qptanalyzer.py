@@ -1355,3 +1355,34 @@ class QptAnalyzer(object):
 
         return self.zpaf
 
+    def get_g2F(self, ikpt, iband, jband):
+        """
+        Compute the g2F function, that is, the squared coupling strength
+        as a function of frequency for a particular pair of bands.
+        """
+
+        nkpt = self.nkpt
+        nband = self.nband
+        nmode = self.nmode
+
+        nomegase = self.nomegase
+        omega_se = self.omegase
+
+        g2F = zeros((nomegase), dtype=np.float)
+
+        omega_q = self.ddb.omega[:].real
+
+        # nkpt, nband, nband, nmode
+        fan_g2, ddw_g2 = self.get_fan_ddw_gkk2_active()
+
+        g2 = fan_g2[ikpt, iband, jband, :]
+
+        for imode in range(nmode):
+
+            domega = omegase - omega_q[imode]
+            F = delta_lorentzian(domega, self.smearing)
+            g2F += g2[imode] * F
+
+        g2F *= self.wtq
+
+        return g2F

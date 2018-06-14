@@ -6,7 +6,6 @@ from ..data import LiF_g2 as test
 
 
 # FIXME
-
 class Test_LiF_g2(SETest):
 
     common = dict(

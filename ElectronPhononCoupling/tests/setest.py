@@ -137,7 +137,6 @@ class SETest(EPCTest):
             spectral_function=True,
             )
 
-
     def get_zpr_stat(self, dirname):
         return self.get_kwargs(
             dirname,
