@@ -487,13 +487,16 @@ class QptAnalyzer(object):
         # DDW term
         # --------
 
+        # Here we hard-code a large smearing for the DDW term
+        smearing_ddw = 0.1 / Ha2eV
+
         # nkpt, nband
         occ0 = self.eig0.get_fermi_function_T0(self.mu)[0,:,:]
     
         # nkpt, nband, nband
         delta_E_ddw = (einsum('kn,m->knm', self.eig0.EIG[0,:,:].real, ones(nband))
                      - einsum('kn,m->kmn', self.eig0.EIG[0,:,:].real, ones(nband))
-                     - einsum('m,kn->knm', ones(nband), (2*occ0-1)) * self.smearing * 1j)
+                     - einsum('m,kn->knm', ones(nband), (2*occ0-1)) * smearing_ddw * 1j)
 
         # nmode, nkpt, nband
         ddw = einsum('knmo,knm->okn', ddw_g2, 1.0 / delta_E_ddw)
