@@ -84,6 +84,9 @@ class EpcAnalyzer(object):
                  smearing_above = 0.00367,
                  smearing_below = 0.00367,
 
+                 nband_se = None,
+                 iband_se = 0,
+
                  # File names
                  rootname='epc.out',
                  eigk_fname='',
@@ -133,7 +136,6 @@ class EpcAnalyzer(object):
         self.ddb_fine_fnames = ddb_fine_fnames
         self.gkk_fine_fnames = gkk_fine_fnames
 
-
         # Initialize a single QptAnalyzer for q=0
 
         # Select first gkk file
@@ -175,6 +177,8 @@ class EpcAnalyzer(object):
             smearing_width = smearing_width,
             smearing_above = smearing_above,
             smearing_below = smearing_below,
+            nband_se = nband_se,
+            iband_se = iband_se,
             )
 
         # Read the first DDB and check that it is Gamma
@@ -237,6 +241,14 @@ class EpcAnalyzer(object):
     @property
     def nband(self):
         return self.qptanalyzer.nband
+
+    @property
+    def nband_se(self):
+        return self.qptanalyzer.nband_se
+
+    @property
+    def iband_se(self):
+        return self.qptanalyzer.iband_se
 
     @property
     def natom(self):
@@ -1095,7 +1107,7 @@ class EpcAnalyzer(object):
             ds.createDimension('number_of_qpoints', self.nqpt)
             ds.createDimension('number_of_spins',
                                len(dim.dimensions['number_of_spins']))
-            ds.createDimension('max_number_of_states',mband)
+            ds.createDimension('max_number_of_states',self.nband_se)
             ds.createDimension('number_of_modes',
                                3*len(dim.dimensions['number_of_atoms']))
 

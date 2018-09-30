@@ -15,6 +15,8 @@ __all__ = ['QptAnalyzer']
 
 class QptAnalyzer(object):
 
+    _nband_se = None
+
     def __init__(self,
                  ddb_fname=None,
                  eigq_fname=None,
@@ -37,6 +39,8 @@ class QptAnalyzer(object):
                  smearing_width = 0.0367,
                  smearing_above = 0.00367,
                  smearing_below = 0.00367,
+                 nband_se = None,  # Number of bands for self-energy
+                 iband_se = 0,  # Starting bands index for self-energy
                  ):
 
         # Files
@@ -62,6 +66,9 @@ class QptAnalyzer(object):
         self.smearing_width = smearing_width
         self.smearing_above = smearing_above
         self.smearing_below = smearing_below
+
+        self.nband_se = nband_se
+        self.iband_se = iband_se
 
     @property
     def nkpt(self):
@@ -95,6 +102,14 @@ class QptAnalyzer(object):
             return self.gkk.nband
         else:
             raise Exception("Don't know nband. No files to read.")
+
+    @property
+    def nband_se(self):
+        return self._nband_se or self.nband
+
+    @nband_se.setter
+    def nband_se(self, value):
+        self._nband_se = value
 
     @property
     def natom(self):
@@ -344,7 +359,9 @@ class QptAnalyzer(object):
         """
 
         nkpt = self.nkpt
-        nband = self.nband
+        nband = self.nband_se
+        ib = self.iband_se
+        fb = ib + nband
         natom = self.natom
         nmode = self.nmode
         nomegase = self.nomegase
@@ -355,8 +372,8 @@ class QptAnalyzer(object):
     
         # FIXME this will not work for nsppol=2
         # nmode, nkpt, nband
-        fan = einsum('knabij,objai->okn', self.eigr2d.EIG2D, displ_red_FAN2)
-        ddw = einsum('knabij,objai->okn', self.eigr2d0.EIG2D, displ_red_DDW2)
+        fan = einsum('knabij,objai->okn', self.eigr2d.EIG2D[:,ib:fb,...], displ_red_FAN2)
+        ddw = einsum('knabij,objai->okn', self.eigr2d0.EIG2D[:,ib:fb,...], displ_red_DDW2)
 
         # Temperature dependence factor
         n_B = self.ddb.get_bose(self.temperatures)
@@ -412,6 +429,13 @@ class QptAnalyzer(object):
             fan = einsum('kniajbm,oabij->knmo', gkk2, displ_red_FAN2)
             ddw = einsum('kniajbm,oabij->knmo', gkk02, displ_red_DDW2)
 
+        nband = self.nband_se
+        ib = self.iband_se
+        fb = ib + nband
+
+        fan = fan[:,ib:fb,...]
+        ddw = ddw[:,ib:fb,...]
+
         # Enforce the diagonal coupling terms to be zero at Gamma
         ddw = self.eig0.symmetrize_fan_degen(ddw)
         if self.is_gamma:
@@ -445,8 +469,11 @@ class QptAnalyzer(object):
         """
 
         nkpt = self.nkpt
-        nband = self.nband
         nmode = self.nmode
+        nband = self.nband_se
+        ib = self.iband_se
+        fb = ib + nband
+
 
         if temperature:
             ntemp = self.ntemp
@@ -477,7 +504,7 @@ class QptAnalyzer(object):
 
         # Fermi-Dirac occupation number
         # nspin, nkpt, nband, ntemp
-        occ = self.eigq.get_fermi_function(self.mu, temperatures)
+        occ = self.eigq.get_fermi_function(self.mu, temperatures)[:,:,:,:]
 
         # G^2
         # nkpt, nband, nband, nmode
@@ -491,11 +518,11 @@ class QptAnalyzer(object):
         smearing_ddw = 0.1 / Ha2eV
 
         # nkpt, nband
-        occ0 = self.eig0.get_fermi_function_T0(self.mu)[0,:,:]
+        occ0 = self.eig0.get_fermi_function_T0(self.mu)[0,:,ib:fb]
     
         # nkpt, nband, nband
-        delta_E_ddw = (einsum('kn,m->knm', self.eig0.EIG[0,:,:].real, ones(nband))
-                     - einsum('kn,m->kmn', self.eig0.EIG[0,:,:].real, ones(nband))
+        delta_E_ddw = (einsum('kn,m->knm', self.eig0.EIG[0,:,ib:fb].real, ones(nband))
+                     - einsum('kn,m->kmn', self.eig0.EIG[0,:,ib:fb].real, ones(nband))
                      - einsum('m,kn->knm', ones(nband), (2*occ0-1)) * smearing_ddw * 1j)
 
         # nmode, nkpt, nband
@@ -529,12 +556,12 @@ class QptAnalyzer(object):
 
         # n + 1 - f
         # nkpt, nband, nmode, ntemp
-        num1 = (einsum('ot,kn->knot', n_B, ones((nkpt,nband)))
+        num1 = (einsum('ot,kn->knot', n_B, ones((nkpt,self.nband)))
               + 1. - einsum('knt,o->knot', occ[0,:,:,:], ones(nmode)))
 
         # n + f
         # nkpt, nband, nmode, ntemp
-        num2 = (einsum('ot,kn->knot', n_B, ones((nkpt,nband)))
+        num2 = (einsum('ot,kn->knot', n_B, ones((nkpt,self.nband)))
               + einsum('knt,o->knot', occ[0,:,:,:], ones(nmode)))
 
         # nkpt, nband
@@ -543,7 +570,7 @@ class QptAnalyzer(object):
         # nkpt, nband, nomegase
         eta = self.get_eta(omega_se)
 
-        for jband in range(nband):
+        for jband in range(self.nband):
 
             # nkpt, nband
             delta_E = (
@@ -724,8 +751,10 @@ class QptAnalyzer(object):
         """
 
         nkpt = self.nkpt
-        nband = self.nband
         nmode = self.nmode
+        nband = self.nband_se
+        ib = self.iband_se
+        fb = ib + nband
 
         if temperature:
             ntemp = self.ntemp
@@ -761,7 +790,7 @@ class QptAnalyzer(object):
         f = occ[0]
 
         # nkpt, nband
-        occ0 = self.eig0.get_fermi_function_T0(self.mu)[0,:,:]
+        occ0 = self.eig0.get_fermi_function_T0(self.mu)[0,:,ib:fb]
     
         # nkpt, nband, nband, nmode
         fan_g2, ddw_g2 = self.get_fan_ddw_gkk2_active()
@@ -777,7 +806,7 @@ class QptAnalyzer(object):
 
         broadening = zeros((nmode,ntemp,nomegase,nkpt,nband))
 
-        for jband in range(nband):
+        for jband in range(self.nband):
 
             # nmode, ntemp, nkpt
             num1 = (n_B + f[...,jband])
@@ -785,7 +814,7 @@ class QptAnalyzer(object):
 
             # nkpt, nband
             delta_E = (
-                self.eig0.EIG[0,:,:].real
+                self.eig0.EIG[0,:,ib:fb].real
                 - einsum('q,n->qn', self.eigq.EIG[0,:,jband].real, ones(nband))
                 )
 
