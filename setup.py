@@ -40,7 +40,7 @@ def write_manifest():
     exclude Examples/Calculations/*/*fort*
     exclude Examples/Out/*
     """
-    with open('MANIFEST.in', 'write') as f:
+    with open('MANIFEST.in', 'w') as f:
         for line in content.strip().splitlines():
             f.write(line.strip() + '\n')
 

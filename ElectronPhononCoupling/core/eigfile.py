@@ -75,9 +75,8 @@ class EigFile(EpcFile):
         """
         nspin, nkpt, nband = self.EIG.shape
         sbe = [(ispin, 0, self.EIG[ispin,ikpt,0]) for ispin in range(nspin)]
-        cmp_sbe = lambda sbe1, sbe2: cmp(sbe1[2], sbe2[2])
         while sbe:
-            min_sbe = sorted(sbe, cmp=cmp_sbe)[0]
+            min_sbe = sorted(sbe, key=lambda x: x[2])[0]
             yield min_sbe
     
             i = sbe.index(min_sbe)

@@ -41,7 +41,7 @@ author_email = authors['GA'][1]
 url = 'https://github.com/GkAntonius/ElectronPhononCoupling'
 
 __author__ = ''
-for auth, email in authors.itervalues():
+for auth, email in iter(authors.values()):
   __author__ += auth + ' <' + email + '>\n'
 del auth, email
 
