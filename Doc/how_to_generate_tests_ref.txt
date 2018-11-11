@@ -1,0 +1,10 @@
+Suppose you make a change to the code and it breaks the test.
+There may be a good reason for that: for example, you might have
+changed some default parameters. If you understand why the tests break,
+and you want to overwrite the reference data for the tests,
+then just run the package as an executable:
+
+    python -m ElectronPhononCoupling
+
+You might have some explaining to do.
+
