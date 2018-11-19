@@ -61,6 +61,7 @@ write_manifest()
 
 install_requires = [
     'numpy >=1.8',
+    'scipy >=1.0.1',
     'mpi4py >=2.0',
     'netCDF4 >=1.2',
     ]
