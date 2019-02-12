@@ -61,9 +61,7 @@ class SETest(EPCTest):
 
         out = compute(**function(self.tmpdir))
 
-        if nc_ref is not None:
-            pass
-        else:
+        if nc_ref is None:
             if refdir is None:
                 refdir = self.refdir
             nc_ref = out.nc_output.replace(self.tmpdir, refdir)

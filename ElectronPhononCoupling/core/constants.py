@@ -17,3 +17,6 @@ kb_HaK = cst.k / cst.physical_constants['Hartree energy'][0]
 
 # Electron mass over atomical mass unit
 me_amu = cst.physical_constants['atomic unit of mass'][0] / cst.physical_constants['atomic mass constant'][0]
+
+
+bohr_to_ang = cst.physical_constants['Bohr radius'][0] / cst.angstrom 
