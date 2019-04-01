@@ -1,10 +1,7 @@
 """
 Functions for adaptative q-point grid construction.
-
 """
 from __future__ import print_function
-import os
-import pickle
 import warnings
 import numpy as np
 
