@@ -4,3 +4,4 @@ from .ddb_converter import *
 from .reduce_kpoints import *
 
 from .symmetrize import *
+from .adaptative_grids import *

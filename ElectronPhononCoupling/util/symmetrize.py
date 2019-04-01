@@ -1,3 +1,6 @@
+"""
+Generic symmetrization procedures on arrays.
+"""
 import numpy as np
 
 def symmetrize_array(arr, indices_groups, axis=0):
