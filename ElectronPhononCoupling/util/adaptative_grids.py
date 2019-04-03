@@ -10,9 +10,9 @@ __all__ = ['get_qpt_adaptative', 'get_qptgrid_adaptative']
 
 def get_qpt_adaptative(symrel, gprim, qpt_c, wtq_c, ngqpt_c, ngqpt_f):
     """
-    Given a coarse grid and a fine grid, generate a new grid that
-    sample the q=0 small cell with the fine grid, and the rest
-    of the BZ with the coarse grid.
+    Given a coarse grid q-point grid, and the parameters of a fine q-point grid,
+    generate a new grid that samples the q=0 small cell with the fine grid,
+    and the rest of the BZ with the coarse grid.
 
     Arguments
     ---------
@@ -105,13 +105,17 @@ def get_qpt_adaptative(symrel, gprim, qpt_c, wtq_c, ngqpt_c, ngqpt_f):
                 count += 1
         return count
 
+    # Add the coarse q-points, excluding Gamma
     for qpt, wtq in zip(qpt_c, wtq_c_s):
 
         if outside_minibz(qpt):
             qpt_a.append(np.array(qpt))
             wtq_a.append(wtq)
 
+    # A star is a list of symmetry-equivalent qpoints. This is the list of stars.
     stars = list()
+
+    # Iterate over fine q-points
     for i1 in range(fc_ratio[0]-1, -fc_ratio[0], -1):
         for i2 in range(fc_ratio[1]-1, -fc_ratio[1], -1):
             for i3 in range(fc_ratio[2]-1, -fc_ratio[2], -1):
@@ -135,16 +139,15 @@ def get_qpt_adaptative(symrel, gprim, qpt_c, wtq_c, ngqpt_c, ngqpt_f):
                     continue
 
                 # Compute the weights by applying all symmetries.
-                # The original weights on the fine grid also account
-                # for larger q-points that were flipped by TRS
-                # then translated to the mini BZ, and we don't want that.
+                # They are different from the weights obtained when using the fine grid
+                # everywhere in the BZ, because these also account for larger q-points
+                # that were flipped by TRS then translated to the mini BZ.
                 star = list()
                 w = 0.0
                 for tr in (1, -1):
                     for S in symrel:
 
                         qp = tr * np.dot(S, q)
-                        #qp = np.dot(S, q)
                         for qs in star:
                             if np.allclose(qp, qs):
                                 break
