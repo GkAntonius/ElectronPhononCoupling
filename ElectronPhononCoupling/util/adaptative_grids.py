@@ -50,12 +50,10 @@ def get_qpt_adaptative(symrel, gprim, qpt_c, wtq_c, ngqpt_c, ngqpt_f):
     wtq_minibz = list()
 
     nqpt_c = len(wtq_c)
-    #nqpt_f = len(wtq_f)
 
     N_f = np.prod(ngqpt_f)
     N_c = np.prod(ngqpt_c)
 
-    #wtq_f = np.array(wtq_f) / sum(wtq_f) * N_f
     wtq_c_s = np.array(wtq_c) / sum(wtq_c) * N_f
 
     ngqpt_c = np.array(ngqpt_c)
@@ -69,49 +67,59 @@ def get_qpt_adaptative(symrel, gprim, qpt_c, wtq_c, ngqpt_c, ngqpt_f):
     if not np.allclose(fc_ratio % 2, 0):
         raise Exception('Ratio of fine-to-coarse grid must be a multiple of 2 in all directions.')
 
+    # List of G vectors used to define the BZ boundary
+    G_BZ_bound = get_G_BZ_bound(gprim)
+
+    # List of G vectors used to define the mini BZ boundary
+    G_mini_BZ_bound = list()
+    for G in G_BZ_bound:
+        G_mini_BZ_bound.append(G / ngqpt_c)
+
+    # Metric for dot product in reduced coordinates
     gmet = np.dot(gprim, gprim.transpose())
-    minibz_gmet = gmet / ngqpt_c
 
-    #minibz_gprim_red = np.identity(3) / ngqpt_c
+    # (G ** 2) / 2 for the mini BZ boundary
+    G2_2_mini_BZ_bound = list()
+    for G in G_mini_BZ_bound:
+        G2_2_mini_BZ_bound.append(0.5 * np.dot(G, np.dot(gmet, G)))
 
-    # G_i ** 2 / 2, where G_i are the primitive vectors of the mini BZ
-    minibz_g2 = np.array([0.5 * gmet[i,i] / ngqpt_c[i] ** 2 for i in range(3)])
+    # Precompute G * gmet for faster dot product
+    G_mini_BZ_bound_gmet = list()
+    for G in G_mini_BZ_bound:
+        G_mini_BZ_bound_gmet.append(np.dot(gmet, G))
 
-    def outside_minibz(minibz_dots, minibz_g2):
+    def outside_minibz(q):
         """Is this q-point outside of the mini BZ?"""
-        return any(minibz_dots[i] - minibz_g2[i] > 1e-8 for i in range(3))
+        for G, G2_2 in zip(G_mini_BZ_bound_gmet, G2_2_mini_BZ_bound):
+            qG = abs(np.dot(q, G))
+            if qG - G2_2 > 1e-8:
+                return True
+        return False
 
-    def nlim_minibz(minibz_dots, minibz_g2):
+    def nlim_minibz(q):
         """Count the number of boundaries of the mini BZ this qpoint lies on"""
-        return np.count_nonzero(np.isclose(minibz_dots, minibz_g2))
+        count = 0
+        for G, G2_2 in zip(G_mini_BZ_bound_gmet, G2_2_mini_BZ_bound):
+            qG = abs(np.dot(q, G))
+            if np.isclose(qG, G2_2):
+                count += 1
+        return count
 
     for qpt, wtq in zip(qpt_c, wtq_c_s):
 
-        minibz_dots = np.abs(np.dot(minibz_gmet, qpt))
-
-        if outside_minibz(minibz_dots, minibz_g2):
+        if outside_minibz(qpt):
             qpt_a.append(np.array(qpt))
             wtq_a.append(wtq)
 
     stars = list()
-    for i1 in range(fc_ratio[0]):
-        for i2 in range(fc_ratio[1]):
-            for i3 in range(fc_ratio[2]):
+    for i1 in range(fc_ratio[0]-1, -fc_ratio[0], -1):
+        for i2 in range(fc_ratio[1]-1, -fc_ratio[1], -1):
+            for i3 in range(fc_ratio[2]-1, -fc_ratio[2], -1):
 
                 q = np.array([i1,i2,i3], dtype=np.float64) / ngqpt_f
 
-                # Make sure that all components are as small as possible.
-                #q = np.array(qpt)
-                #for i in range(3):
-                #    if abs(q[i]) > 0.5:
-                #        q[i] -= np.sign(q[i]) * 1.0
-                #if np.sign(q[0]) < 0 :
-                #    q *= -1
-
-                minibz_dots = np.abs(np.dot(minibz_gmet, q))
-
                 # Exclude points outside the mini BZ
-                if outside_minibz(minibz_dots, minibz_g2):
+                if outside_minibz(q):
                     continue
 
                 # Exclude points already counted
@@ -136,6 +144,7 @@ def get_qpt_adaptative(symrel, gprim, qpt_c, wtq_c, ngqpt_c, ngqpt_f):
                     for S in symrel:
 
                         qp = tr * np.dot(S, q)
+                        #qp = np.dot(S, q)
                         for qs in star:
                             if np.allclose(qp, qs):
                                 break
@@ -146,7 +155,7 @@ def get_qpt_adaptative(symrel, gprim, qpt_c, wtq_c, ngqpt_c, ngqpt_f):
 
                 # Scale the weights of the q-points that end up on the boundary
                 # of the mini BZ
-                nlim = nlim_minibz(minibz_dots, minibz_g2)
+                nlim = nlim_minibz(q)
                 w /= 2 ** nlim
                     
                 # Add the q-point and its weight,
@@ -245,4 +254,53 @@ def get_qptgrid_adaptative(symmetries, qptgrid_coarse, ngqpt_f):
         )
 
     return qptgrid_adaptative
+
+
+def get_G_BZ_bound(gprim):
+    """
+    Given the primitive vectors, find a set of G vectors
+    that can be used to define the Brillouin Zone.
+    """
+
+    vol = np.linalg.det(gprim)
+    if np.isclose(vol, 0.):
+        raise Exception('Primitive vectors are not linearly independent.')
+
+    gprim_scale = np.array(gprim) / vol
+
+    gmet = np.dot(gprim_scale, gprim_scale.transpose())
+
+    G_BZ_bound = [
+        np.array([1, 0, 0], dtype=np.float),
+        np.array([0, 1, 0], dtype=np.float),
+        np.array([0, 0, 1], dtype=np.float),
+        ]
+
+    def outside_BZ(q, G_BZ_bound):
+        for G in G_BZ_bound:
+            Ggmet = np.dot(gmet, G)
+            G2_2 = 0.5 * np.dot(G, Ggmet)
+            qG = abs(np.dot(q, Ggmet))
+            # This criterion is somewhat arbitrary,
+            # but we want to make sure that the point is well inside
+            # and not on the boundary
+            if qG - G2_2 > -1e-3:
+                return True
+        return False
+
+    G_BZ_bound_extend = np.array([
+        [0, 1, 1],
+        [1, 0, 1],
+        [1, 1, 0],
+        [0, 1,-1],
+        [1, 0,-1],
+        [1,-1, 0],
+        ], dtype=np.float)
+
+    for Gnew in G_BZ_bound_extend:
+        if not outside_BZ(Gnew/2, G_BZ_bound):
+            G_BZ_bound.append(Gnew)
+
+    return G_BZ_bound
+
 
