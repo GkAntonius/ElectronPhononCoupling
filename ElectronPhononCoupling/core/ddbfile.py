@@ -350,6 +350,29 @@ class DdbFile(EpcFile):
 
         return bose
 
+    def get_mode_born_effective_charges(self):
+        r"""
+        Compute the Born effective charges in the mode basis,
+        that is, for each mode, a vector defined as
+
+            Z_{\nu,j} = \sum_{\kappa, j'} Z_{\kappa, j', j} \xi^{\nu}_{\kappa, j'}
+
+        """
+        
+        Z_cart = self.BECT
+        Z_nu = np.zeros((self.nmode, self.ncart), dtype=np.complex)
+
+        omega, eigvect = self.compute_dynmat()
+
+        for imode in range(self.nmode):
+            for icart in range(self.ncart):
+                for jat in range(self.natom):
+                  for jcart in range(self.ncart):
+                    jpert = jat * 3 + jcart
+
+                    Z_nu[imode,icart] += Z_cart[jcart,jat,icart] * eigvect[jpert,imode]
+
+        return Z_nu, omega, eigvect
 
     # This old function reads the DDB from the ascii file.
     # It is left here for legacy.
