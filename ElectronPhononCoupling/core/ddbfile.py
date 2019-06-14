@@ -403,30 +403,6 @@ class DdbFile(EpcFile):
 
         return Z_nu, omega, eigvect
 
-
-    def get_wrong_born_effective_charges_mode(self, gsr=None):
-        r"""
-        Compute the WRONG Born effective charges in the mode basis.
-        It is wrong because we forget to convert the Born effective charge tensor
-        from reduced to cartesian coordinates.
-        """
-        
-        Z_cart = self.BECT
-        Z_nu = np.zeros((self.nmode, self.ncart), dtype=np.complex)
-
-        omega, eigvect = self.compute_dynmat()
-
-        for imode in range(self.nmode):
-            for icart in range(self.ncart):
-                for jat in range(self.natom):
-                  for jcart in range(self.ncart):
-                    jpert = jat * 3 + jcart
-
-                    Z_nu[imode,icart] += Z_cart[jcart,jat,icart] * eigvect[jpert,imode]
-
-        return Z_nu, omega, eigvect
-
-
     # This old function reads the DDB from the ascii file.
     # It is left here for legacy.
     #
