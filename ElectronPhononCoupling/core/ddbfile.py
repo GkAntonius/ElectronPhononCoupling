@@ -26,9 +26,11 @@ class DdbFile(EpcFile):
     omega = None
     asr = True
     
+
     def __init__(self, *args, **kwargs):
         self.asr = kwargs.pop('asr', True)
         super(DdbFile, self).__init__(*args, **kwargs)
+
 
     def set_amu(self, amu):
         """
@@ -39,6 +41,7 @@ class DdbFile(EpcFile):
                 Atom masses for each atom type, in atomic mass units.
         """
         self.amu = np.array(amu)
+
 
     def read_nc(self, fname=None):
         """Open the DDB.nc file and read it."""
@@ -65,6 +68,7 @@ class DdbFile(EpcFile):
             self.E2D = np.einsum('aibj->bjai', self.E2D)  # Indicies are reversed when writing them from Fortran.
 
             self.BECT = root.variables['born_effective_charge_tensor'][:self.ncart,:self.natom,:self.ncart]
+
 
     def broadcast(self):
         """Broadcast the data from master to all workers."""
@@ -122,6 +126,7 @@ class DdbFile(EpcFile):
     @property
     def nmode(self):
         return 3 * self.natom
+
 
     def get_mass_scaled_dynmat_cart(self):
         """
@@ -235,6 +240,7 @@ class DdbFile(EpcFile):
     
         return self.omega, self.eigvect
 
+
     def get_reduced_displ(self, noscale=False):
         """
         Compute the mode eigenvectors, scaled by the mode displacements
@@ -271,6 +277,7 @@ class DdbFile(EpcFile):
 
         return self.polvec
     
+
     def get_reduced_displ_squared(self):
         """
         Compute the squared reduced displacements (scaled by phonon frequencies)
@@ -334,6 +341,7 @@ class DdbFile(EpcFile):
     
         return displ_red_FAN2, displ_red_DDW2
 
+
     def get_bose(self, temperatures):
         """
         Get the Bose-Einstein occupations on a range of temperatures.
@@ -350,13 +358,57 @@ class DdbFile(EpcFile):
 
         return bose
 
-    def get_mode_born_effective_charges(self):
+
+    def get_born_effective_charges_cart(self, gsr):
+        """
+        Arguments
+        ---------
+        gsr: GsrFile object
+        """
+
+        zions = gsr.atoms_zion
+        
+        Z_cart = np.zeros((self.natom,self.ncart,self.ncart), dtype=np.complex)
+        
+        for iat in range(self.natom):
+            zion = zions[iat]
+            Z_cart[iat,:,:] = np.dot(self.rprim, np.dot(self.gprimd, self.BECT[:,iat,:])) / (2*np.pi) + zion * np.identity(self.ncart)
+
+        return Z_cart
+
+
+    def get_born_effective_charges_mode(self, gsr):
         r"""
         Compute the Born effective charges in the mode basis,
         that is, for each mode, a vector defined as
 
             Z_{\nu,j} = \sum_{\kappa, j'} Z_{\kappa, j', j} \xi^{\nu}_{\kappa, j'}
 
+        gsr: GsrFile object
+
+        """
+
+        Z_cart = self.get_born_effective_charges_cart(gsr)
+
+        Z_nu = np.zeros((self.nmode, self.ncart), dtype=np.complex)
+
+        omega, eigvect = self.compute_dynmat()
+
+        for imode in range(self.nmode):
+            for icart in range(self.ncart):
+                for jat in range(self.natom):
+                  for jcart in range(self.ncart):
+                    jpert = jat * 3 + jcart
+                    Z_nu[imode,icart] += Z_cart[jat,jcart,icart] * eigvect[jpert,imode]
+
+        return Z_nu, omega, eigvect
+
+
+    def get_wrong_born_effective_charges_mode(self, gsr=None):
+        r"""
+        Compute the WRONG Born effective charges in the mode basis.
+        It is wrong because we forget to convert the Born effective charge tensor
+        from reduced to cartesian coordinates.
         """
         
         Z_cart = self.BECT
@@ -373,6 +425,7 @@ class DdbFile(EpcFile):
                     Z_nu[imode,icart] += Z_cart[jcart,jat,icart] * eigvect[jpert,imode]
 
         return Z_nu, omega, eigvect
+
 
     # This old function reads the DDB from the ascii file.
     # It is left here for legacy.
