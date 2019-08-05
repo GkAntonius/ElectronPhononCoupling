@@ -365,14 +365,13 @@ class DdbFile(EpcFile):
         ---------
         gsr: GsrFile object
         """
-
         zions = gsr.atoms_zion
         
-        Z_cart = np.zeros((self.natom,self.ncart,self.ncart), dtype=np.complex)
+        Z_cart = np.zeros((self.natom, self.ncart, self.ncart), dtype=np.complex)
         
         for iat in range(self.natom):
             zion = zions[iat]
-            Z_cart[iat,:,:] = np.dot(self.rprim, np.dot(self.gprimd, self.BECT[:,iat,:])) / (2*np.pi) + zion * np.identity(self.ncart)
+            Z_cart[iat,:,:] = np.dot(self.rprim, np.dot(self.gprimd, self.BECT[:,iat,:])) / (2 * np.pi) + zion * np.identity(self.ncart)
 
         return Z_cart
 
@@ -385,9 +384,7 @@ class DdbFile(EpcFile):
             Z_{\nu,j} = \sum_{\kappa, j'} Z_{\kappa, j', j} \xi^{\nu}_{\kappa, j'}
 
         gsr: GsrFile object
-
         """
-
         Z_cart = self.get_born_effective_charges_cart(gsr)
 
         Z_nu = np.zeros((self.nmode, self.ncart), dtype=np.complex)
@@ -401,8 +398,55 @@ class DdbFile(EpcFile):
                     jpert = jat * 3 + jcart
                     Z_nu[imode,icart] += Z_cart[jat,jcart,icart] * eigvect[jpert,imode]
 
-        return Z_nu, omega, eigvect
+        return Z_nu, omega
 
+    def get_born_effective_charges_mode_dot_q(self, gsr, q=None):
+        r"""
+        Compute the Born effective charges in the mode basis,
+        that is, for each mode, a vector defined as
+
+            Z_{\nu,j} = \sum_{\kappa, j'} Z_{\kappa, j', j} \xi^{\nu}_{\kappa, j'}
+
+        gsr: GsrFile object
+        q: Direction of the qavevector in reduced coordinates.
+            For q=Gamma, one has to pic
+
+        """
+        Z_cart = self.get_born_effective_charges_cart(gsr)
+
+        Z_nu = np.zeros((self.nmode, self.ncart), dtype=np.complex)
+
+        omega, eigvect = self.compute_dynmat()
+        Z_nu, omega = self.get_born_effective_charges_mode(gsr)
+
+        if q is None:
+            q = self.qred
+
+        qnorm = np.linalg.norm(q)
+        if np.isclose(qnorm, 0):
+            qnorm = 1
+            raise Exception('Cannot compute Z.q for q=0. Please chose a unitary direction for q')
+        qhat = np.array(q) /  qnorm
+
+        Z_nu_q = np.zeros((self.nmode), dtype=np.complex)
+
+        for imode in range(self.nmode):
+
+            Z_nu_q[imode] = np.dot(Z_nu[imode,:], qhat)
+
+        return Z_nu_q, omega
+
+
+
+
+
+
+
+
+
+
+    # Only LEGACY code below --------------------------------------
+    #
     # This old function reads the DDB from the ascii file.
     # It is left here for legacy.
     #
@@ -500,5 +544,3 @@ class DdbFile(EpcFile):
     #        self.iqpt = [np.float(tmp[1]),np.float(tmp[2]),np.float(tmp[3])]
     #        Flag = 3
     #        self.E2D = zeros((3,self.natom,3,self.natom),dtype=complex)
-
-
