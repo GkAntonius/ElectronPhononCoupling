@@ -336,11 +336,17 @@ class EpcAnalyzer(object):
 
         self.set_fermi_level(mu)
 
+    _iqpt = 0
+    def iqpt(self):
+        return self._iqpt
+
     def set_iqpt(self, iqpt, fine=False):
         """
         Give the qptanalyzer the weight and files corresponding
         to one particular qpoint and read the files. 
         """
+        self._iqpt = iqpt
+
         if fine:
             self.set_iqpt_fine(iqpt)
         else:
@@ -445,8 +451,10 @@ class EpcAnalyzer(object):
 
     @mpi_watch
     def sum_qpt_function(self, func_name, fine=False, *args, **kwargs):
-        """Call a certain function or each q-points and sum the result."""
-
+        """
+        Call a certain function or each q-points and sum the result.
+        Only master gets the result, other workers get None.
+        """
         partial_sum = self.sum_qpt_function_me(func_name, fine=fine,
                                                *args, **kwargs)
 
@@ -471,6 +479,17 @@ class EpcAnalyzer(object):
 
         return total
 
+
+    _qpt_output_format = ("Q-point: {:>8d}"
+                         " with wtq = {:.8f}"
+                         " and reduced coord. {}")
+
+    def print_qpt(self, iqpt=None):
+        """Output q-point index, weight, and reduced wavevector."""
+        iqpt = self.iqpt if iqpt is None else iqpt
+        print(self._qpt_output_format.format(
+                iqpt, self.qptanalyzer.wtq, self.qptanalyzer.qred))
+
     def sum_qpt_function_me(self, func_name, fine=False, *args, **kwargs):
         """
         Call a certain function or each q-points of this worker
@@ -483,8 +502,7 @@ class EpcAnalyzer(object):
         self.set_iqpt(iqpt, fine=fine)
 
         if self.verbose:
-            print("Q-point: {} with wtq = {} and reduced coord. {}".format(
-                  iqpt, self.qptanalyzer.wtq, self.qptanalyzer.qred))
+            self.print_qpt()
 
         q0 = getattr(self.qptanalyzer, func_name)(*args, **kwargs)
         total = copy(q0)
@@ -497,8 +515,7 @@ class EpcAnalyzer(object):
             self.set_iqpt(iqpt, fine=fine)
 
             if self.verbose:
-                print("Q-point: {} with wtq = {} and reduced coord. {}".format(
-                      iqpt, self.qptanalyzer.wtq, self.qptanalyzer.qred))
+                self.print_qpt()
 
             qpt = getattr(self.qptanalyzer, func_name)(*args, **kwargs)
             total += qpt
@@ -508,10 +525,10 @@ class EpcAnalyzer(object):
     @mpi_watch
     def gather_qpt_function(self, func_name, *args, **kwargs):
         """
-        Call a certain function or each q-points and gather all results to master.
-        Other workers get None.
+        Call a certain function or each q-points and gather all results
+        to master. Other workers get None. Adds a dimension to the array
+        returned by function, indexing the q-point with the first index.
         """
-
         partial = self.gather_qpt_function_me(func_name, *args, **kwargs)
 
         if i_am_master:
@@ -558,8 +575,7 @@ class EpcAnalyzer(object):
         self.set_iqpt(iqpt)
 
         if self.verbose:
-            print("Q-point: {} with wtq = {} and reduced coord. {}".format(
-                  iqpt, self.qptanalyzer.wtq, self.qptanalyzer.qred))
+            self.print_qpt()
 
         q0 = np.array(getattr(self.qptanalyzer, func_name)(*args, **kwargs))
         total = np.zeros([nqpt_me] + list(q0.shape), dtype=q0.dtype)
@@ -574,9 +590,7 @@ class EpcAnalyzer(object):
             self.set_iqpt(iqpt)
 
             if self.verbose:
-                print("Q-point: {} with wtq = {} and reduced coord. {}".format(
-                      iqpt, self.qptanalyzer.wtq, self.qptanalyzer.qred))
-
+                self.print_qpt()
 
             qpt = getattr(self.qptanalyzer, func_name)(*args, **kwargs)
             total[i+1,...] = qpt[...]
@@ -1085,6 +1099,8 @@ class EpcAnalyzer(object):
         # Write on a NC files with etsf-io name convention
         with nc.Dataset(self.nc_output, 'w') as ds:
 
+            # FIXME Reading from EIGR2D file is too restrictive
+            #       Should handle GKK.nc only
             # Read dim from first EIGR2D file
             dim = nc.Dataset(dim_fname, 'r')
 
