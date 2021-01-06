@@ -337,8 +337,13 @@ class EpcAnalyzer(object):
         self.set_fermi_level(mu)
 
     _iqpt = 0
+    @property
     def iqpt(self):
         return self._iqpt
+
+    @iqpt.setter
+    def iqpt(self, value):
+        self._iqpt = value
 
     def set_iqpt(self, iqpt, fine=False):
         """

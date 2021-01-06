@@ -9,7 +9,8 @@ def symmetrize_array(arr, indices_groups, axis=0):
 
     For example, given a list of indices_groups [[a1,a2,a3], [b1,b2,b3]],
     the arrays (arr[a1], arr[a2], arr[a3]) will be averaged,
-    as well as the arrays (arr[b1], arr[b2], arr[b3]).
+    as well as the arrays (arr[b1], arr[b2], arr[b3]) among themselves.
+    Non-degenerate eigenvalues are lists of a single element.
 
     Arguments
     ---------

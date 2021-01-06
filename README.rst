@@ -48,9 +48,8 @@ Documentation
  
 * For how to use this module, see the Examples directory.
 
-* For the theory pertaining the electronic self-energy
-    due to electron-phonon coupling, and temperature dependence
-    of electronic structure, see [PRB 92, 085137 (2015)].
+* For the theory pertaining the electronic self-energy due to electron-phonon coupling,
+  and temperature dependence of electronic structure, see [PRB 92, 085137 (2015)].
 
 * For the advanced user and developer, see the Doc directory.
 
